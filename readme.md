@@ -2,6 +2,8 @@
 
 An NVDA add-on for testers who work by ear.
 
+[Українською](https://github.com/ruslan-rv-ua/axygen-checklist/blob/develop/addon/doc/uk/readme.md)
+
 Axygen Checklist walks a test checklist with global commands while the system
 focus stays in the application under test. An item can be marked passed, failed
 or skipped, commented on, read back by speech and filtered out of the way
