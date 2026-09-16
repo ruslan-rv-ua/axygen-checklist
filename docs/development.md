@@ -91,6 +91,8 @@ uv run python -m unittest discover -s tests
 
 Або одним заходом — `uv run prek run --all-files`.
 
+У CI це workflow `checks.yml`: він спрацьовує на кожен push у `develop` чи `main` і на кожен PR — тобто й тоді, коли робота лягає в `develop` напряму, без PR. `build_addon.yml` лишився суто складальним: PR, теґ `v*` або ручний запуск.
+
 Тести не імпортують сам додаток: його модулі потребують живого NVDA. Під `unittest` лягає лише та логіка, яку можна відділити від API скрінрідера.
 
 **Локальний Pyright не дивиться на `addon/`** — цю перевірку робить CI, який спершу викладає поруч вихідники NVDA (`pyrightconfig.ci.json`). Вона ловить саме той клас помилок, який інакше знаходиться лише на слух: неіснуючий метод NVDA виглядає в редакторі як справжній, а падає вже в скрінрідері. Перевірено на `scriptHandler.getLastScriptExecutionTime()` — функції, якої немає (§6 спеки): CI дає `"getLastScriptExecutionTime" is not a known attribute of module "scriptHandler"`.

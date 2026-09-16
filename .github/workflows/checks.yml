@@ -1,0 +1,36 @@
+name: Checks
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+
+jobs:
+  checks:
+    name: Lint, type check and unit tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v10.0.1
+        with:
+          enable-cache: true
+
+      - name: Install dependencies
+        run: uv sync
+
+      - name: Lint and format
+        run: uv run prek run --all-files
+
+      # The add-on's modules resolve only against NVDA's own source, which is why
+      # pyproject.toml excludes addon/ from the default pyright configuration.
+      - name: Type check the add-on against NVDA's source
+        run: |
+          git clone --depth 1 https://github.com/nvaccess/nvda.git ../nvda
+          uv run pyright --project pyrightconfig.ci.json
+
+      - name: Unit tests
+        run: uv run python -m unittest discover -s tests -v
