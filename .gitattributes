@@ -2,3 +2,7 @@
 * text=auto
 
 *.nvda-addon binary
+
+# Keep source line numbers out of .po files. Needs the filter configured once:
+# git config --global filter.cleanpo.clean "msgcat - --no-location"
+*.po filter=cleanpo

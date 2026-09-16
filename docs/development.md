@@ -10,7 +10,16 @@
 * **SCons ≥ 4.10.1** — збірка.
 * **GNU gettext** (`msgfmt`, `xgettext`) — компіляція `.po` у `.mo`. Windows-збірки: [gettext-iconv-windows](https://mlocati.github.io/articles/gettext-iconv-windows.html).
 * **Markdown ≥ 3.8.2** — генерація HTML з документації.
-* **`uv`** — dev-залежності шаблону (Ruff, Pyright, `prek`). `uv run prek install` вмикає ті самі перевірки, що й CI, на кожному коміті; `uv run prek run --all-files` проганяє їх по всьому репозиторію.
+* **`uv`** — dev-залежності шаблону (Ruff, Pyright, `prek`) із закріпленими версіями. `uv run prek install` вмикає ті самі перевірки, що й CI, на кожному коміті; `uv run prek run --all-files` проганяє їх по всьому репозиторію. Можна нічого не ставити глобально: `uv run --group build scons` бере закріплений SCons.
+* Один раз варто налаштувати фільтр, що прибирає номери рядків із `.po` (на нього вказує `.gitattributes`):
+
+```
+git config --global filter.cleanpo.clean "msgcat - --no-location"
+```
+
+* Два відхилення від шаблону, зроблені свідомо:
+  * хук `no-commit-to-branch` вилучено з `prek.toml` — він блокує й ті merge-коміти, які `git flow release finish` робить на `main`;
+  * теку `addon/` виключено з перевірки Pyright: модулі NVDA (`globalPluginHandler`, `addonHandler`, …) розв'язуються лише проти вихідників NVDA. Якщо поруч із репозиторієм покласти їх (`git clone --depth 1 https://github.com/nvaccess/nvda ../nvda`, далі `scons source` у тому дереві), шлях `../nvda/source` уже прописано в `pyproject.toml` — тоді рядок `"addon"` з `exclude` прибирають, і сувора перевірка типів повертається.
 
 ## 2. Перша збірка
 
@@ -26,6 +35,12 @@ scons
 * `<addon_name>-<addon_version>.nvda-addon` у корені репозиторію.
 
 Жоден із цих файлів не комітиться — єдине джерело метаданих `buildVars.py` (§6 спеки).
+
+Де що лежить:
+
+* `readme.md` у корені — це документація **аддона**, а не репозиторію: збірка копіює її в `addon/doc/en/readme.md` і робить із неї `readme.html`, який NVDA відкриває кнопкою довідки. Тому вона англійською (мова оригіналу, §6 спеки), а українська версія — `addon/doc/uk/readme.md`.
+* `addon/locale/uk/LC_MESSAGES/nvda.po` — каталог перекладу інтерфейсу. Після зміни рядків у коді: `scons pot` оновлює `axygenChecklist.pot`, далі `msgmerge --update addon/locale/uk/LC_MESSAGES/nvda.po axygenChecklist.pot` доливає нові рядки в каталог.
+* `changelog.md` у корені — тіло майбутнього GitHub-релізу; його читає workflow при пуші теґа.
 
 Перед першою збіркою в `buildVars.py` мають бути заповнені `addon_minimumNVDAVersion` і `addon_lastTestedNVDAVersion`: з типовим `None` маніфест не пройде перевірку й NVDA просто не завантажить теку. `addon_lastTestedNVDAVersion` тримай не нижчою за свою версію NVDA — інакше аддон буде позначено несумісним і вимкнено.
 
@@ -61,6 +76,21 @@ powershell -ExecutionPolicy Bypass -File tools\dev-link.ps1 -NvdaConfig D:\nvda-
 * **Нове посилання, нова тека аддона** — перезапуск NVDA: `addonHandler` будує список аддонів один раз, на старті.
 
 Наслідок для структури коду: **увесь код додатка лежить під `addon/globalPlugins/<пакет>/`**. Модуль поза цим деревом (скажімо, спільна бібліотека в корені `addon/`) не має префікса `globalPlugins`, тому перезавантаження плагінів не викине його з `sys.modules` — у пам'яті лишиться стара версія, і поведінка стане непоясненною.
+
+### Перевірки перед комітом
+
+Те саме, що проганяє CI:
+
+```
+uv run --group lint ruff format --check .
+uv run --group lint ruff check .
+uv run --group lint pyright
+uv run python -m unittest discover -s tests
+```
+
+Або одним заходом — `uv run prek run --all-files`.
+
+Тести не імпортують сам додаток: його модулі потребують живого NVDA. Під `unittest` лягає лише та логіка, яку можна відділити від API скрінрідера.
 
 ## 5. Від'єднання
 
