@@ -130,7 +130,9 @@ for mdFile in env.Glob(docsDir / "*/*.md"):
 # Pot target
 i18nFiles = expandGlobs(buildVars.i18nSources)
 gettextvars: dict[str, str] = {
-	"gettext_package_bugs_address": "nvda-translations@groups.io",
+	# Deviation from the add-on template: reports about this add-on's strings belong in its own
+	# tracker, not on the NVDA community translation list, which does not carry this add-on.
+	"gettext_package_bugs_address": "https://github.com/ruslan-rv-ua/axygen-checklist/issues",
 	"gettext_package_name": buildVars.addon_info["addon_name"],
 	"gettext_package_version": buildVars.addon_info["addon_version"],
 }

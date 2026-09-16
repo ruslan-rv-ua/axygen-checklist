@@ -1,0 +1,16 @@
+{
+	// Used only by CI (see .github/workflows/build_addon.yml), which checks NVDA's source
+	// out next to the repository first. The configuration in pyproject.toml excludes
+	// addon/, because without that checkout every symbol taken from NVDA is unknown and
+	// strict mode reports the whole file.
+	"typeCheckingMode": "strict",
+	"pythonPlatform": "Windows",
+	// NVDA 2025.3 executes the add-on under Python 3.11. The build environment runs a
+	// newer Python, which must not tempt the add-on into syntax the screen reader cannot
+	// execute.
+	"pythonVersion": "3.11",
+	"include": ["addon"],
+	"extraPaths": ["./addon", "../nvda/source"],
+	"venvPath": ".venv",
+	"venv": "."
+}

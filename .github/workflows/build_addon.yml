@@ -2,6 +2,8 @@ name: build addon
 
 on:
   push:
+    # Tags only: development builds are deliberately not published, since the
+    # working copy is tested through the development link (docs/development.md).
     tags: ["v*"]
 
   pull_request:
@@ -29,6 +31,11 @@ jobs:
 
     - name: Code checks
       run: uv run prek run --all-files
+
+    - name: Type check the add-on against NVDA's source
+      run: |
+        git clone --depth 1 https://github.com/nvaccess/nvda.git ../nvda
+        uv run pyright --project pyrightconfig.ci.json
 
     - name: building addon
       run: uv run scons && uv run scons pot

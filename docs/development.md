@@ -17,9 +17,10 @@
 git config --global filter.cleanpo.clean "msgcat - --no-location"
 ```
 
-* Два відхилення від шаблону, зроблені свідомо:
+* Три відхилення від шаблону, зроблені свідомо:
   * хук `no-commit-to-branch` вилучено з `prek.toml` — він блокує й ті merge-коміти, які `git flow release finish` робить на `main`;
-  * теку `addon/` виключено з перевірки Pyright: модулі NVDA (`globalPluginHandler`, `addonHandler`, …) розв'язуються лише проти вихідників NVDA. Якщо поруч із репозиторієм покласти їх (`git clone --depth 1 https://github.com/nvaccess/nvda ../nvda`, далі `scons source` у тому дереві), шлях `../nvda/source` уже прописано в `pyproject.toml` — тоді рядок `"addon"` з `exclude` прибирають, і сувора перевірка типів повертається.
+  * теку `addon/` виключено з перевірки Pyright у `pyproject.toml`: модулі NVDA (`globalPluginHandler`, `addonHandler`, …) розв'язуються лише проти вихідників NVDA, і без них сувора перевірка сипле помилками на кожному символі. Натомість цю перевірку робить CI — див. нижче;
+  * адресу для звітів перекладачів у `sconstruct` змінено зі списку спільноти NVDA на issue-трекер проєкту: у той список наші рядки не потрапляють.
 
 ## 2. Перша збірка
 
@@ -91,6 +92,17 @@ uv run python -m unittest discover -s tests
 Або одним заходом — `uv run prek run --all-files`.
 
 Тести не імпортують сам додаток: його модулі потребують живого NVDA. Під `unittest` лягає лише та логіка, яку можна відділити від API скрінрідера.
+
+**Локальний Pyright не дивиться на `addon/`** — цю перевірку робить CI, який спершу викладає поруч вихідники NVDA (`pyrightconfig.ci.json`). Вона ловить саме той клас помилок, який інакше знаходиться лише на слух: неіснуючий метод NVDA виглядає в редакторі як справжній, а падає вже в скрінрідері. Перевірено на `scriptHandler.getLastScriptExecutionTime()` — функції, якої немає (§6 спеки): CI дає `"getLastScriptExecutionTime" is not a known attribute of module "scriptHandler"`.
+
+Те саме локально, якщо колись захочеться (неглибокий клон важить близько 270 МБ, а не гігабайт):
+
+```
+git clone --depth 1 https://github.com/nvaccess/nvda.git ../nvda
+uv run pyright --project pyrightconfig.ci.json
+```
+
+Конфіг заразом тримає `pythonVersion` на 3.11 — тій версії, яку виконує NVDA, — тож синтаксис, новіший за неї, не пройде.
 
 ## 5. Від'єднання
 
