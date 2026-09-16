@@ -20,8 +20,10 @@ msgstr ""
 #. Add-on summary/title, usually the user visible name of the add-on
 #. Translators: Summary/title for this add-on
 #. to be shown on installation and add-on information found in add-on store
+# The product name is deliberately left in English in every locale: it is the name the
+# add-on carries in the Add-on Store, in the configuration directory and in its documentation.
 msgid "Axygen Checklist"
-msgstr "Axygen Чекліст тестувальника"
+msgstr "Axygen Checklist"
 
 #. Add-on description
 #. Translators: Long description to be shown for this add-on on add-on information from add-on store
