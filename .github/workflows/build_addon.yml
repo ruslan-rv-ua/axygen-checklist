@@ -66,6 +66,10 @@ jobs:
         echo -e "\nSHA256: " >> changelog.md
         sha256sum *.nvda-addon >> changelog.md
 
+    # No `prerelease` condition here: the Add-on Store validator requires the
+    # version to be `X.Y` or `X.Y.Z` with integer parts, so a suffixed tag such
+    # as `v0.2.0-rc1` could never be published anyway. Every `v*` tag is a full
+    # release. See docs/development.md, section 7.
     - name: Release
       uses: softprops/action-gh-release@v3
       with:
@@ -74,4 +78,3 @@ jobs:
           *.pot
         body_path: changelog.md
         fail_on_unmatched_files: true
-        prerelease: ${{ contains(github.ref, '-') }}
