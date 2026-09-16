@@ -1,0 +1,31 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+env/
+
+# NVDA add-on build output
+*.nvda-addon
+build/
+dist/
+addon/doc/*.html
+*.mo
+
+# Local runtime state (see docs/requirements.md, section 2)
+state.json
+
+# Editors / IDE
+.vscode/
+.idea/
+*.swp
+
+# OS
+Thumbs.db
+desktop.ini
+.DS_Store
+
+# Backups / scratch
+*.bak
+*.orig
