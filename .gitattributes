@@ -1,5 +1,8 @@
-# Normalize line endings: LF in the repository, native in the working copy.
-* text=auto
+# Normalize line endings: LF both in the repository and in the working copy.
+# The working copy was left native until the pre-commit hooks started rewriting
+# files with LF on every run, which made Git report content-identical files as
+# modified; pinning the checkout to LF ends that churn.
+* text=auto eol=lf
 
 *.nvda-addon binary
 
