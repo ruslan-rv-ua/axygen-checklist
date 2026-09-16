@@ -60,7 +60,11 @@ i18nSources: list[str] = pythonSources + ["buildVars.py"]
 
 # Files that will be ignored when building the nvda-addon file
 # Paths are relative to the addon directory, not to the root directory of your addon sources.
-excludedFiles: list[str] = []
+# Patterns are matched with pathlib.Path.match, which compares from the right.
+# `__pycache__/*`: NVDA compiles the add-on while it runs from the development link
+# (see docs/development.md), leaving bytecode of its own Python version in the source tree.
+# `*.po`: only the compiled `.mo` is read at runtime.
+excludedFiles: list[str] = ["__pycache__/*", "*.po"]
 
 # Base language for the NVDA add-on
 # Interface strings are written in English (see docs/requirements.md, section 6);
