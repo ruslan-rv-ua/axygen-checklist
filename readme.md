@@ -19,11 +19,29 @@ This page describes the add-on as a whole, and not all of it is built yet.
 
 * **Walking a checklist at all.** This build only registers the add-on with
   NVDA: no commands, no speech, no file handling. That arrives in 0.1.0.
-* **Filtering to unchecked items** (`NVDA+Shift+F`) — due in 0.2.0.
+* **Filtering to unchecked items** — due in 0.2.0.
 
 Until 1.0.0 the checklist file format and the set of commands may still change
 from one release to the next. From 1.0.0 on, neither changes without a major
 version bump.
+
+## When a command does nothing
+
+Axygen Checklist claims the `NVDA+Alt` prefix. Another add-on may bind the same
+combination, and nothing tells you so: whichever global plugin NVDA happens to
+reach first wins, and that order is not guaranteed to survive a restart. The
+key simply does the wrong thing.
+
+The fix is NVDA's own dialog: **Preferences → Input Gestures → category Axygen
+Checklist**. Deleting a binding there hands the key back to whoever else wants
+it; adding one gives a command a combination of your choosing. Every command
+appears in that category, including the ones that normally live inside the
+command mode and ship with no key at all.
+
+The same dialog is the answer if the entry key feels wrong under your hands.
+It was chosen for an `NVDA` key on `CapsLock`, where both modifiers fall to the
+left hand and the letter to the right; with `NVDA` on `Insert` a different
+letter is easier.
 
 Copyright (C) 2026 Ruslan Iskov. Distributed under the terms of the GNU General
 Public License version 2 or later; see COPYING.txt.
