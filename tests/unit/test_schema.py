@@ -22,6 +22,10 @@ The tie has three strands:
   the identifiers live in ``items`` inside ``sections``, and ``uniqueItems``
   works on a single array.
 
+The samples under ``samples/`` are checked here as well, for a different
+reason: they are whole files meant to be opened in the add-on by hand, and one
+that quietly stopped being valid would be worse than no sample at all.
+
 The tests assert only that an invalid fixture is rejected, never which keyword
 rejected it. A validator's wording belongs to no contract, and asserting on it
 would break at the next release of `jsonschema` without catching anything.
@@ -38,6 +42,7 @@ import jsonschema
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SCHEMA_PATH = REPO_ROOT / "docs" / "checklist-v1.schema.json"
 FIXTURES = REPO_ROOT / "tests" / "fixtures"
+SAMPLES = REPO_ROOT / "samples"
 DOCUMENTS = (
 	REPO_ROOT / "docs" / "requirements.md",
 	REPO_ROOT / "docs" / "checklist-format.md",
@@ -147,6 +152,19 @@ class TestFixtures(unittest.TestCase):
 			with self.subTest(fixture=path.name):
 				document = json.loads(path.read_text(encoding="utf-8"))
 				self.assertNotEqual(contract_errors(document), [])
+
+
+class TestSamples(unittest.TestCase):
+	def test_samples_are_whole_valid_checklists(self):
+		paths = sorted(SAMPLES.glob("*.json"))
+		self.assertTrue(paths, "no samples found")
+		for path in paths:
+			with self.subTest(sample=path.name):
+				document = json.loads(path.read_text(encoding="utf-8"))
+				# A sample is a file a tester opens, so unlike the documented
+				# counterexamples a fragment here would be a mistake.
+				self.assertTrue(is_whole_checklist(document), "not a whole checklist")
+				self.assertEqual(contract_errors(document), [])
 
 
 class TestDocumentedExamples(unittest.TestCase):
