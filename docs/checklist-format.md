@@ -147,6 +147,52 @@ An agent that renumbers fifty items to insert one makes the diff unreviewable
 today, and breaks the run history that a future version of the add-on will hang
 off these numbers.
 
+## Writing items that work by ear
+
+The format will take anything you put in `text`. What the tester gets is a
+sentence read aloud while their hands are in another application and their eyes
+are doing nothing at all. That is a narrow channel, and it changes what a good
+item looks like.
+
+**One item is one action and the result you expect.** An item that names only a
+subject leaves the tester to invent both the procedure and the standard:
+
+```json
+{"id": 1, "text": "Check minimising to the tray"}
+```
+
+Check it how, and how would they know it worked? Written for the ear, the same
+ground becomes a short run of items that each say what to do and what should
+happen:
+
+```json
+[
+  {"id": 1, "text": "Start the app with --minimize. The window may flash and vanish into the tray", "note": "That flash is expected"},
+  {"id": 2, "text": "Press Ctrl+Shift+H - the window comes back"},
+  {"id": 3, "text": "The screen reader announces the window and whatever holds focus. Silence here means the bug is alive"}
+]
+```
+
+**Put preconditions in a first section of their own.** Restarting the screen
+reader, closing another copy of the application, turning a setting on - these
+are not checks, they are the state the run needs in order to mean anything. A
+tester who discovers at item twelve that the first eleven ran against the wrong
+state has lost the run, not an item.
+
+**Write sections that stand alone, and order them by what matters.** Runs get
+interrupted, and the tester stops where they stop. If the first two sections
+carry the substance of what changed, an interrupted run is still worth reading;
+if the substance is spread evenly over nine, it is not.
+
+**Say so when correct behaviour looks like a bug.** Anything startling but
+intended - a window that flashes before it hides, a pause, a sound - belongs in
+`note`. Without it you get a filed defect and a wasted afternoon. `note` is
+spoken right after the item, which is exactly when it is needed.
+
+Keep the writing plain. `text` and `note` are spoken, not rendered: emphasis
+markers and backticks buy nothing, and depending on the reader's punctuation
+settings they may be read out.
+
 ## Validation
 
 Put `$schema` at the top of the file. Editors and agents pick it up with no
@@ -218,6 +264,8 @@ Format: https://github.com/ruslan-rv-ua/axygen-checklist/blob/develop/docs/check
 ```
 
 * You write `checklist_name`, `section_name`, `id`, `text` and `note`.
+* One item is one action plus the result you expect; preconditions go in a
+  first section of their own.
 * `status` (`pending` / `passed` / `failed` / `blocked` / `skipped`) and
   `comment` belong to the tester and are written by the add-on. When editing an
   existing checklist, re-read the file first and preserve both verbatim. Never
