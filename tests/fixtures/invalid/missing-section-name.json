@@ -1,0 +1,13 @@
+{
+  "checklist_name": "Base checklist",
+  "sections": [
+    {
+      "items": [
+        {
+          "id": 1,
+          "text": "An item"
+        }
+      ]
+    }
+  ]
+}

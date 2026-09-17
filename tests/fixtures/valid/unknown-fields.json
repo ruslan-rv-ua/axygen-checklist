@@ -1,0 +1,17 @@
+{
+  "checklist_name": "Carries data the add-on knows nothing about",
+  "generated_by": "an agent",
+  "sections": [
+    {
+      "section_name": "Controls",
+      "severity": "high",
+      "items": [
+        {
+          "id": 1,
+          "text": "An item",
+          "ticket": "AX-42"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,23 @@
+{
+  "checklist_name": "Base checklist",
+  "sections": [
+    {
+      "section_name": "Controls",
+      "items": [
+        {
+          "id": 1,
+          "text": "An item"
+        }
+      ]
+    },
+    {
+      "section_name": "Keyboard navigation",
+      "items": [
+        {
+          "id": 1,
+          "text": "Another item"
+        }
+      ]
+    }
+  ]
+}

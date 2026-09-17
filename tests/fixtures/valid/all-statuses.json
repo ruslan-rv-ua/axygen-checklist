@@ -1,0 +1,35 @@
+{
+  "checklist_name": "Base checklist",
+  "sections": [
+    {
+      "section_name": "Controls",
+      "items": [
+        {
+          "id": 1,
+          "text": "Not checked yet",
+          "status": "pending"
+        },
+        {
+          "id": 2,
+          "text": "Works",
+          "status": "passed"
+        },
+        {
+          "id": 3,
+          "text": "Does not work",
+          "status": "failed"
+        },
+        {
+          "id": 4,
+          "text": "Could not be checked",
+          "status": "blocked"
+        },
+        {
+          "id": 5,
+          "text": "Deliberately not checked",
+          "status": "skipped"
+        }
+      ]
+    }
+  ]
+}

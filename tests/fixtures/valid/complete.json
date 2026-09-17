@@ -1,0 +1,37 @@
+{
+  "$schema": "https://raw.githubusercontent.com/ruslan-rv-ua/axygen-checklist/main/docs/checklist-v1.schema.json",
+  "format_version": 1,
+  "checklist_name": "Every field the format has",
+  "sections": [
+    {
+      "section_name": "Controls",
+      "items": [
+        {
+          "id": 1,
+          "text": "Every button has an accessible name",
+          "status": "passed"
+        },
+        {
+          "id": 2,
+          "text": "Focus is visible",
+          "note": "Try Tab and Shift+Tab"
+        },
+        {
+          "id": 3,
+          "text": "Fields have labels",
+          "status": "failed",
+          "comment": "Phone has no label"
+        }
+      ]
+    },
+    {
+      "section_name": "Keyboard navigation",
+      "items": [
+        {
+          "id": 4,
+          "text": "Tab wraps inside the dialog"
+        }
+      ]
+    }
+  ]
+}

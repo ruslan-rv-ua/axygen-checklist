@@ -1,0 +1,86 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/ruslan-rv-ua/axygen-checklist/main/docs/checklist-v1.schema.json",
+  "title": "Axygen Checklist file, format version 1",
+  "description": "A checklist for the Axygen Checklist add-on for NVDA. Sections hold items; the add-on records the outcome of each item back into this same file. Normative source: docs/requirements.md, section 2. Authoring guide: docs/checklist-format.md.",
+  "type": "object",
+  "required": ["checklist_name", "sections"],
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "format": "uri",
+      "description": "URL of this schema. The add-on never reads or writes it; it survives as an unknown field."
+    },
+    "format_version": {
+      "const": 1,
+      "description": "Version of the file format. Optional; absent means 1. A version above the one the add-on knows makes it refuse the file."
+    },
+    "checklist_name": {
+      "type": "string",
+      "description": "Name of the checklist. Content, not interface: never translated."
+    },
+    "sections": {
+      "type": "array",
+      "minItems": 1,
+      "description": "Sections of the checklist. At least one; flat lists without sections are not supported.",
+      "items": { "$ref": "#/$defs/section" }
+    }
+  },
+  "additionalProperties": {
+    "description": "Unknown properties are allowed. The add-on ignores them on read and preserves them when it rewrites the file."
+  },
+  "$defs": {
+    "section": {
+      "type": "object",
+      "title": "Section",
+      "description": "A named group of items.",
+      "required": ["section_name", "items"],
+      "properties": {
+        "section_name": {
+          "type": "string",
+          "description": "Name of the section. Content, not interface: never translated."
+        },
+        "items": {
+          "type": "array",
+          "description": "Items in this section. May be empty.",
+          "items": { "$ref": "#/$defs/item" }
+        }
+      },
+      "additionalProperties": {
+        "description": "Unknown properties are allowed. The add-on ignores them on read and preserves them when it rewrites the file."
+      }
+    },
+    "item": {
+      "type": "object",
+      "title": "Item",
+      "description": "One thing to check. Uniqueness of `id` across the whole file is required but cannot be expressed in JSON Schema; see docs/requirements.md, section 2.",
+      "required": ["id", "text"],
+      "properties": {
+        "id": {
+          "type": "integer",
+          "description": "Identifier of the item, unique within the file. Written by the author, never renumbered: it is what keeps an item the same item across edits."
+        },
+        "text": {
+          "type": "string",
+          "description": "The text of the item, spoken by the screen reader. Content, not interface: never translated."
+        },
+        "status": {
+          "enum": ["pending", "passed", "failed", "blocked", "skipped"],
+          "default": "pending",
+          "description": "Outcome of the check, written by the tester through the add-on. Optional; absent means \"pending\". An identifier, not text: never translated. An unrecognised value makes the add-on refuse the whole file."
+        },
+        "note": {
+          "type": "string",
+          "description": "Hint written by the author before the run, spoken automatically after the item text. Read-only in the add-on. Content, not interface: never translated."
+        },
+        "comment": {
+          "type": "string",
+          "description": "Conclusion written by the tester after the check. Erased when a section or the whole checklist is reset. Content, not interface: never translated."
+        }
+      },
+      "additionalProperties": {
+        "description": "Unknown properties are allowed. The add-on ignores them on read and preserves them when it rewrites the file."
+      }
+    }
+  }
+}

@@ -47,10 +47,16 @@ lint = [
 	"prek==0.4.8",
 	"pyright[nodejs]==1.1.407",
 ]
+# Unit tests. `jsonschema` is tooling, never shipped: the add-on validates
+# checklists with its own pass, and section 7.3 of docs/requirements.md says why.
+test = [
+	"jsonschema==4.26.0",
+]
 dev = [
 	{ include-group = "build" },
 	{ include-group = "l10n" },
 	{ include-group = "lint" },
+	{ include-group = "test" },
 ]
 
 [tool.ruff]

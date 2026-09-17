@@ -13,6 +13,14 @@ A checklist is a plain JSON file. It carries the items to check and, once the
 run is over, the result of each one, so a run can be handed over, kept next to
 the build it belongs to, or repeated later.
 
+Checklists are usually written by a coding agent working inside the project
+under test, so the format is documented for one:
+[how to write a checklist](https://github.com/ruslan-rv-ua/axygen-checklist/blob/develop/docs/checklist-format.md),
+with a [JSON Schema](https://github.com/ruslan-rv-ua/axygen-checklist/blob/develop/docs/checklist-v1.schema.json)
+next to it and a block to paste into your project's `AGENTS.md`. Worth reading
+before letting an agent edit a checklist somebody has already run: the statuses
+and comments in the file are a tester's work, not the agent's to regenerate.
+
 ## Not in this version yet
 
 This page describes the add-on as a whole, and not all of it is built yet.

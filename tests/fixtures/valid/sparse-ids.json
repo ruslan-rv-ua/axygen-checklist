@@ -1,0 +1,18 @@
+{
+  "checklist_name": "Base checklist",
+  "sections": [
+    {
+      "section_name": "Controls",
+      "items": [
+        {
+          "id": 3,
+          "text": "Kept its number after item 1 and 2 were deleted"
+        },
+        {
+          "id": 17,
+          "text": "Added later, took the next unused number"
+        }
+      ]
+    }
+  ]
+}

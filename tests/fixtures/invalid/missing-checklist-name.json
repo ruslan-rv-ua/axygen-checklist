@@ -1,0 +1,13 @@
+{
+  "sections": [
+    {
+      "section_name": "Controls",
+      "items": [
+        {
+          "id": 1,
+          "text": "An item"
+        }
+      ]
+    }
+  ]
+}
