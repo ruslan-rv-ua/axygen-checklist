@@ -174,10 +174,16 @@ happen:
 ```
 
 **Put preconditions in a first section of their own.** Restarting the screen
-reader, closing another copy of the application, turning a setting on - these
+reader, closing another copy of the application, turning a setting on — these
 are not checks, they are the state the run needs in order to mean anything. A
 tester who discovers at item twelve that the first eleven ran against the wrong
 state has lost the run, not an item.
+
+A rule that governs the whole run rather than one check belongs in that section
+too, as an item of its own — always start it this way, always use that profile.
+There is a `note` on an item and nothing on a checklist, so the alternative is
+the same warning repeated in three places, and three chances for it to be read
+once and skipped twice.
 
 **Write sections that stand alone, and order them by what matters.** Runs get
 interrupted, and the tester stops where they stop. If the first two sections
@@ -185,9 +191,16 @@ carry the substance of what changed, an interrupted run is still worth reading;
 if the substance is spread evenly over nine, it is not.
 
 **Say so when correct behaviour looks like a bug.** Anything startling but
-intended - a window that flashes before it hides, a pause, a sound - belongs in
+intended — a window that flashes before it hides, a pause, a sound — belongs in
 `note`. Without it you get a filed defect and a wasted afternoon. `note` is
 spoken right after the item, which is exactly when it is needed.
+
+**Spell out a key whose name is punctuation.** Write "Ctrl plus comma", not
+`Ctrl+,`: what a synthesiser does with a bare comma depends on the tester's
+punctuation setting, and it may come out as a pause or as nothing. A command
+suffers worse than a key, because the punctuation is the part that matters —
+`.\app.exe` can reach the ear as the plain name of the app, which is the exact
+thing the item was telling them not to type.
 
 Keep the writing plain. `text` and `note` are spoken, not rendered: emphasis
 markers and backticks buy nothing, and depending on the reader's punctuation
