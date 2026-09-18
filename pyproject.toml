@@ -23,6 +23,15 @@ license = {file = "COPYING.txt"}
 # This package is not installed as a library; every dependency is tooling used to
 # build, translate, or lint the add-on. They are declared as PEP 735 dependency groups.
 dependencies = []
+
+# This distribution holds nothing: the add-on is packaged by `scons` into a
+# `.nvda-addon`, never by setuptools. Saying so explicitly is not cosmetic. Left to
+# guess, setuptools scans the repository root for things that look like packages, and
+# refuses to build at all once it finds more than one — which it has since `samples/`
+# arrived, taking `uv sync` down with it and every CI check behind it.
+[tool.setuptools]
+py-modules = []
+
 # PEP 735 dependency groups. `uv sync` installs the `dev` group by default, which
 # pulls in every tool needed to build, translate, and lint the add-on.
 [dependency-groups]
