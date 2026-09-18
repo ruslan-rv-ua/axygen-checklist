@@ -282,12 +282,18 @@ anything outside the five values. An unrecognised `status` is fatal on purpose
 rather than being quietly read as `"pending"`: the add-on rewrites the whole
 file on the first change, so a quiet fix would erase real results permanently.
 
-`format_version` is the one case with a message of its own. A number higher
-than the add-on knows means the file comes from a newer version, and the add-on
-says so instead of blaming the file. The schema is pinned to version 1 by name
-for the same reason: when `format_version: 2` exists there will be a
-`checklist-v2.schema.json` beside this one, and files written for version 1 go
-on validating against version 1 forever.
+`format_version`, if you write it at all, has to be a version the add-on knows,
+which today means exactly `1`. A number *higher* than that is the one case with
+a message of its own: it means the file comes from a newer version, and the
+add-on says so instead of blaming the file. Any other number is an ordinary
+refusal — there was never a version zero to point anyone at. The schema is
+pinned to version 1 by name for the same reason: when `format_version: 2`
+exists there will be a `checklist-v2.schema.json` beside this one, and files
+written for version 1 go on validating against version 1 forever.
+
+Save the file as UTF-8. A byte order mark at the front is tolerated and
+ignored, so a file straight out of a Windows editor opens; any other encoding
+is refused as an unreadable file, because nothing in it says what you meant.
 
 ## Paste this into your `AGENTS.md`
 

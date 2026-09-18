@@ -139,6 +139,7 @@ class TestValidationContract(unittest.TestCase):
 		"duplicate-id": (checklist.ProblemKind.DUPLICATE_ID, "id"),
 		"unknown-status": (checklist.ProblemKind.UNKNOWN_STATUS, "status"),
 		"format-version-too-high": (checklist.ProblemKind.FUTURE_FORMAT, "format_version"),
+		"format-version-unknown": (checklist.ProblemKind.UNKNOWN_FORMAT, "format_version"),
 	}
 
 	def test_the_table_covers_every_invalid_fixture(self):
@@ -217,6 +218,14 @@ class TestFormatVersion(unittest.TestCase):
 			checklist.loads(fixture_text("invalid", "format-version-too-high"))
 		self.assertEqual(refusal.exception.problem.kind, checklist.ProblemKind.FUTURE_FORMAT)
 		self.assertEqual(refusal.exception.problem.value, 2)
+
+	def test_a_version_the_add_on_does_not_know_is_an_ordinary_refusal(self):
+		# Section 2: only a *higher* version earns "created by a newer version".
+		# There was never a format zero, so there is no update to send anyone to.
+		with self.assertRaises(checklist.ChecklistError) as refusal:
+			checklist.loads(fixture_text("invalid", "format-version-unknown"))
+		self.assertEqual(refusal.exception.problem.kind, checklist.ProblemKind.UNKNOWN_FORMAT)
+		self.assertEqual(refusal.exception.problem.value, 0)
 
 	def test_the_known_version_written_out_is_accepted(self):
 		loaded = checklist.loads(fixture_text("valid", "complete"))

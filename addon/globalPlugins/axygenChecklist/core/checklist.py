@@ -37,6 +37,13 @@ from . import status
 #: because it is the old one that will meet it.
 KNOWN_FORMAT_VERSION = 1
 
+#: Every format version this add-on can read. Section 2 states the rule as "a
+#: version the add-on knows" rather than "no higher than the newest one",
+#: because which versions a release reads is that release's decision: 2.0.0
+#: will say whether it still opens version 1 files, and there is nothing to
+#: settle that on today.
+KNOWN_FORMAT_VERSIONS = frozenset({KNOWN_FORMAT_VERSION})
+
 
 class ProblemKind(enum.Enum):
 	"""What the validation contract of section 2 has against a file.
@@ -60,6 +67,9 @@ class ProblemKind(enum.Enum):
 	DUPLICATE_ID = enum.auto()
 	#: `status` holds something outside the five the format allows.
 	UNKNOWN_STATUS = enum.auto()
+	#: `format_version` holds a number this add-on does not know, and which is
+	#: not a later one either — there is no update to send anyone to.
+	UNKNOWN_FORMAT = enum.auto()
 	#: The file was written by a newer version of the add-on.
 	FUTURE_FORMAT = enum.auto()
 
@@ -343,6 +353,11 @@ def _check_format_version(document: dict[str, Any]) -> None:
 		raise _refusal(ProblemKind.NOT_AN_INTEGER, _NOWHERE, "format_version", version)
 	if version > KNOWN_FORMAT_VERSION:
 		raise _refusal(ProblemKind.FUTURE_FORMAT, _NOWHERE, "format_version", version)
+	if version not in KNOWN_FORMAT_VERSIONS:
+		# A version below the newest one we know is not a version at all: there
+		# was never a format zero, so "update the add-on" would be the wrong
+		# thing to say and the ordinary refusal is the right one.
+		raise _refusal(ProblemKind.UNKNOWN_FORMAT, _NOWHERE, "format_version", version)
 
 
 def _validated(document: Any) -> dict[str, Any]:
