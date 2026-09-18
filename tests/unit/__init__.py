@@ -3,8 +3,9 @@
 # This file is covered by the GNU General Public License version 2 or later.
 # See the file COPYING.txt for more details.
 
-"""Puts the add-on package on `sys.path` so that `core` imports as a top-level package.
+"""Puts on `sys.path` what the tests import by name. Two entries, two reasons.
 
+The **add-on package directory** makes `core` import as a top-level package.
 The core of the add-on lives inside the add-on package, at
 `addon/globalPlugins/axygenChecklist/core/`, because NVDA reloads plugins by
 dropping everything under the `globalPlugins` prefix out of `sys.modules`.
@@ -20,12 +21,20 @@ two import lines in a test module would have to stay in the right order for
 
 Stubbing NVDA's own modules is deliberately not an option; see the section on
 the core/shell boundary in docs/development.md.
+
+The **repository root** makes `tools` and `buildVars` import at all. Running
+the suite as `python -m unittest` from the root puts them within reach anyway,
+which is exactly why the entry belongs here: a test that passes only when it is
+run from one directory passes for a reason nobody wrote down. Every other path
+in this suite is derived from `__file__`, and now these are too.
 """
 
 import sys
 from pathlib import Path
 
-_ADDON_PACKAGE = Path(__file__).resolve().parents[2] / "addon" / "globalPlugins" / "axygenChecklist"
+_REPO_ROOT = Path(__file__).resolve().parents[2]
+_ADDON_PACKAGE = _REPO_ROOT / "addon" / "globalPlugins" / "axygenChecklist"
 
-if str(_ADDON_PACKAGE) not in sys.path:
-	sys.path.insert(0, str(_ADDON_PACKAGE))
+for _entry in (_ADDON_PACKAGE, _REPO_ROOT):
+	if str(_entry) not in sys.path:
+		sys.path.insert(0, str(_entry))

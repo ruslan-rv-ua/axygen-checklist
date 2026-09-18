@@ -7,7 +7,10 @@
 	"pythonPlatform": "Windows",
 	// NVDA 2025.3 executes the add-on under Python 3.11. The build environment runs a
 	// newer Python, which must not tempt the add-on into syntax the screen reader cannot
-	// execute.
+	// execute. That is the Python of the NVDA named by `addon_lastTestedNVDAVersion` in
+	// buildVars.py -- the same field the workflow derives the source checkout from -- and
+	// it is raised together with that field. docs/development.md, "Перевірки перед
+	// комітом", lists the three things that move as one.
 	"pythonVersion": "3.11",
 	// tests/typecheck holds the probe that keeps `import wx` resolvable: until the first
 	// window lands, nothing in addon/ imports wx, and nothing else would notice the types
