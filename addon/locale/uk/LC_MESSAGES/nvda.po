@@ -47,6 +47,8 @@ msgstr ", провалено {count}"
 
 #. Translators: The name of the category this add-on's commands appear under
 #. in NVDA's Input Gestures dialog.
+#. Translators: The title of the add-on's windows: the product name, which is
+#. not translated in any locale.
 #. Add-on summary/title, usually the user visible name of the add-on
 #. Translators: Summary/title for this add-on
 #. to be shown on installation and add-on information found in add-on store
@@ -72,6 +74,25 @@ msgid ""
 "Reads the name of the current section of the checklist and the progress "
 "through it"
 msgstr "Озвучує назву поточного розділу чекліста та прогрес у ньому"
+
+#. Translators: The description of a command, as it appears in NVDA's Input Gestures dialog.
+msgid ""
+"Resets the current section of the checklist, erasing its statuses and "
+"comments"
+msgstr "Скидає поточний розділ чекліста, стираючи його статуси й коментарі"
+
+#. Translators: The question asked before the current section of the checklist
+#. is reset, that is every item put back to not checked and every comment erased.
+msgid ""
+"Reset the section? Every status and comment in the section will be erased. "
+"This cannot be undone."
+msgstr ""
+"Скинути розділ? Будуть стерті всі статуси та коментарі розділу. Цю дію не "
+"можна відмінити."
+
+#. Translators: Spoken after the current section of the checklist has been reset.
+msgid "Section reset"
+msgstr "Розділ скинуто"
 
 #. Add-on description
 #. Translators: Long description to be shown for this add-on on add-on information from add-on store

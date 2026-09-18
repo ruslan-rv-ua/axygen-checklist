@@ -38,9 +38,11 @@ Checklists are plain JSON files that record the result of the run."""),
 	# Documentation file name
 	addon_docFileName="readme.html",
 	# Minimum NVDA version supported.
-	# 2024.1 is the first round version that has every API the specification relies on:
-	# `gui.message.displayDialogAsModal` landed in 2023.3, `gui.blockAction` earlier still.
-	addon_minimumNVDAVersion="2024.1.0",
+	# 2025.1 is the first version that has every API the specification relies on:
+	# `gui.message.displayDialogAsModal` landed in 2023.3, `gui.blockAction` earlier
+	# still, and `gui.message.MessageDialog` — the confirmation dialog of section 3.2.2
+	# and section 5 — in 2025.1, the release that also deprecated `gui.messageBox`.
+	addon_minimumNVDAVersion="2025.1.0",
 	# Last NVDA version supported/tested.
 	addon_lastTestedNVDAVersion="2025.3.0",
 	# Add-on update channel (default is None, denoting stable releases,

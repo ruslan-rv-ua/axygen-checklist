@@ -11,10 +11,12 @@ the half of it that cannot be unit tested — gestures, series of presses, speec
 move takes them is worked out in `core.navigation`, and the words are in
 `wording`.
 
-**No command here changes the system focus.** That is the invariant of section
-1, and the five windows of the add-on all cost either a second press of a
-series or a deliberately armed command mode. Everything in this module answers
-with speech or a tone and leaves the focus where the tester put it.
+**No command here changes the system focus from the first press of a global
+combination.** That is the invariant of section 1, and the five windows of the
+add-on all cost either a second press of a series or a deliberately armed
+command mode. A command answers with speech or a tone and leaves the focus
+where the tester put it; the ones that open a window do so through `modal`,
+which is where the focus is taken and given back.
 
 **Series of presses come from NVDA and from nowhere else.** Section 6 allows
 only `scriptHandler.getLastScriptRepeatCount()`: NVDA runs the script on every
@@ -104,9 +106,9 @@ from gui import blockAction
 from logHandler import log
 from scriptHandler import script
 
-from . import commandmode, signals, wording
+from . import commandmode, modal, signals, wording
 from .core import checklist, navigation, progress, session, status
-from .core.checklist import Checklist
+from .core.checklist import Checklist, Section
 from .core.navigation import Direction, Position, Step
 from .core.session import Session
 
@@ -146,6 +148,7 @@ _DIGIT_STATUSES = {
 _MODE_KEYS = {
 	**{identifier: "setStatus" for identifier in _DIGIT_STATUSES},
 	"kb:p": "speakSectionProgress",
+	"kb:r": "resetSection",
 }
 
 
@@ -414,6 +417,42 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 		self._mode.disarm()
 		self._speak_progress()
 
+	@script(
+		description=_(
+			# Translators: The description of a command, as it appears in NVDA's Input Gestures dialog.
+			"Resets the current section of the checklist, erasing its statuses and comments",
+		),
+	)
+	@blockAction.when(blockAction.Context.MODAL_DIALOG_OPEN)
+	def script_resetSection(self, gesture: inputCore.InputGesture) -> None:
+		# The `R` key of the command mode, and the first command of the add-on
+		# to open a window. It may, and that is the focus invariant of section
+		# 1 as it applies here: the window costs a deliberately armed mode, so
+		# nobody working in someone else's window reaches it by accident. The
+		# dialog is the confirmation entire — no state waits for a second press
+		# and no second timer runs over the first (section 3.2.2). The mode is
+		# dropped now, as by any key of it, and the answer arrives after this
+		# script has long returned; what it is about is settled here, while
+		# the tester still stands in the section they asked about.
+		self._mode.disarm()
+		standing = self._standing()
+		if standing is None:
+			return
+		loaded, position = standing
+		section = navigation.section_at(loaded, position)
+		modal.confirm(
+			_(
+				# Translators: The question asked before the current section of the checklist
+				# is reset, that is every item put back to not checked and every comment erased.
+				"Reset the section? Every status and comment in the section will be erased. "
+				"This cannot be undone.",
+			),
+			# Translators: The title of the add-on's windows: the product name, which is
+			# not translated in any locale.
+			_("Axygen Checklist"),
+			then=lambda: self._reset_section(loaded, section),
+		)
+
 	def _navigate(self, direction: Direction) -> None:
 		"""Move one item, or — on the second press of the series — one section.
 
@@ -529,37 +568,68 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 		is any status but `pending` (`core.status.is_verdict`), and one of the
 		two callers here is the digit that puts an item back to `pending`.
 
-		**The file is written first and the verdict spoken second** (section 4).
-		Reversed, a failure would arrive after the word it contradicts, where
-		the next keypress cancels the speech queue and leaves the tester with
-		"passed" and every reason to believe the result is safe — the silent
-		loss the rest of section 2 is written against. The voice pays nothing
-		for the order: the write was synchronous on every press either way, and
-		all that moves is where inside that window the speech begins.
-
-		So a write that fails **refuses the command**: one phrase and nothing
-		else, no status word and no signal that the run is over. No window
-		either — the tester is in the application under test, and section 1
-		forbids taking the focus out of it. It says so on every press, because
-		a command that changes data and then falls silent is, at the keyboard,
-		an add-on that has crashed; and the change is left standing in memory,
-		because rolling it back is the mechanism section 3.2.1 was glad to be
-		rid of. Any later write carries the whole file, so the first one that
-		succeeds takes everything that has piled up with it.
+		The write, and what is said when it does not get there, are `_write`'s
+		(section 4); the status word and the end-of-run notice follow only once
+		the file holds the verdict they are about.
 		"""
 		standing = self._standing()
 		if standing is None:
 			return
 		loaded, position = standing
 		item = navigation.item_at(loaded, position)
-		try:
-			item.record_status(rule(item.status))
-		except OSError:
-			log.error(f"could not write the checklist to {loaded.path}", exc_info=True)
-			ui.message(wording.spoken_write_failure())
+		if not self._write(loaded, lambda: item.record_status(rule(item.status))):
 			return
 		ui.message(wording.status_word(item.status))
 		self._announce_completion(loaded)
+
+	def _reset_section(self, loaded: Checklist, section: Section) -> None:
+		"""Put every item of `section` back to pending, erase its comments, say so.
+
+		The tester has just answered "Yes" (section 3.2.2), and the focus is
+		already back in the application under test — NVDA is announcing that
+		window, and this phrase stands after it. That is why there is a phrase
+		at all: a reset that said nothing would sound exactly like a reset that
+		did not happen, which is the rule section 4 holds every change to.
+
+		No end-of-run notice, and none possible: the section held an item to
+		stand on, and every item in it is pending now.
+		"""
+		if not self._write(loaded, section.reset):
+			return
+		# Translators: Spoken after the current section of the checklist has been reset.
+		ui.message(_("Section reset"))
+
+	def _write(self, loaded: Checklist, change: Callable[[], None]) -> bool:
+		"""Make `change`, which rewrites the file, and say so only when it did not get there.
+
+		Every command that changes data comes through here, and section 4
+		holds them all to one order: **the file is written first and the
+		result spoken second**. Reversed, a failure would arrive after the word
+		it contradicts, where the next keypress cancels the speech queue and
+		leaves the tester with "passed" and every reason to believe the result
+		is safe — the silent loss the rest of section 2 is written against.
+		The voice pays nothing for the order: the write was synchronous on
+		every press either way, and all that moves is where inside that window
+		the speech begins.
+
+		So a write that fails **refuses the command**, and False is the
+		caller's cue to add nothing: one phrase, no status word, no next item,
+		no signal that the run is over. No window either — the tester is in the
+		application under test, and section 1 forbids taking the focus out of
+		it. It says so on every press, because a command that changes data and
+		then falls silent is, at the keyboard, an add-on that has crashed; and
+		the change is left standing in memory, because rolling it back is the
+		mechanism section 3.2.1 was glad to be rid of. Any later write carries
+		the whole file, so the first one that succeeds takes everything that
+		has piled up with it.
+		"""
+		try:
+			change()
+		except OSError:
+			log.error(f"could not write the checklist to {loaded.path}", exc_info=True)
+			ui.message(wording.spoken_write_failure())
+			return False
+		return True
 
 	def _announce_completion(self, loaded: Checklist) -> None:
 		"""Say that the run is over, when this status left nothing pending.
