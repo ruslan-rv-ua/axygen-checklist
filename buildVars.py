@@ -53,7 +53,10 @@ Checklists are plain JSON files that record the result of the run."""),
 )
 
 # Define the python files that are the sources of your add-on.
-pythonSources: list[str] = ["addon/globalPlugins/axygenChecklist/*.py"]
+# Recursive on purpose: the add-on has sub-packages (`core/`, see
+# docs/development.md), and without `**` editing one of them would not make
+# scons rebuild the `.nvda-addon`, nor reach `scons pot` through `i18nSources`.
+pythonSources: list[str] = ["addon/globalPlugins/axygenChecklist/**/*.py"]
 
 # Files that contain strings for translation. Usually your python sources
 i18nSources: list[str] = pythonSources + ["buildVars.py"]
