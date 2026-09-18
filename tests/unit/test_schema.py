@@ -26,6 +26,11 @@ The samples under ``samples/`` are checked here as well, for a different
 reason: they are whole files meant to be opened in the add-on by hand, and one
 that quietly stopped being valid would be worse than no sample at all.
 
+One test runs the other way round. The write rules of section 2 produce files
+too, and a file the add-on has written has to be a file of the documented
+format -- otherwise the schema would be right about every checklist except the
+ones the add-on itself leaves behind.
+
 The tests assert only that an invalid fixture is rejected, never which keyword
 rejected it. A validator's wording belongs to no contract, and asserting on it
 would break at the next release of `jsonschema` without catching anything.
@@ -37,6 +42,8 @@ import unittest
 from typing import Any, Iterator
 
 import jsonschema
+
+from core import checklist
 
 from .support import REPO_ROOT, fixture_paths
 
@@ -186,3 +193,29 @@ class TestDocumentedExamples(unittest.TestCase):
 			if not is_whole_checklist(json.loads(block))
 		]
 		self.assertTrue(partial_examples, "expected a partial example in the guide")
+
+
+class TestWrittenFiles(unittest.TestCase):
+	"""What the add-on writes is a file of the documented format.
+
+	Reading is tied to the schema by the fixtures above; this ties writing to
+	it. The rules of section 2 add fields of their own -- an explicit `status`
+	on every item, an explicit `format_version` -- and drop others, so a file
+	that went in valid can only be trusted to come out valid if someone checks.
+	"""
+
+	def test_every_valid_fixture_is_still_valid_after_a_rewrite(self):
+		for path in fixture_paths("valid"):
+			with self.subTest(fixture=path.name):
+				loaded = checklist.loads(path.read_text(encoding="utf-8"))
+				self.assertEqual(contract_errors(json.loads(checklist.dumps(loaded))), [])
+
+	def test_every_sample_is_still_valid_after_a_rewrite(self):
+		# The samples are the closest thing here to a real checklist: they are
+		# long, hand-written, and carry the fields an author actually uses.
+		paths = sorted(SAMPLES.glob("*.json"))
+		self.assertTrue(paths, "no samples found")
+		for path in paths:
+			with self.subTest(sample=path.name):
+				loaded = checklist.loads(path.read_text(encoding="utf-8"))
+				self.assertEqual(contract_errors(json.loads(checklist.dumps(loaded))), [])

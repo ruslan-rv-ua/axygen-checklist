@@ -3,14 +3,28 @@
 # This file is covered by the GNU General Public License version 2 or later.
 # See the file COPYING.txt for more details.
 
-"""Reading a checklist file into the model the rest of the add-on works with.
+"""Reading and writing the checklist file the rest of the add-on works with.
 
-The format and the validation contract are specified in section 2 of
-docs/requirements.md. The contract is checked in one pass at load time, and any
-breach refuses the file whole: the alternative is an exception in the middle of
-a session, with the focus in the application under test and NVDA suddenly
-silent. A blind tester sees no traceback, and one clear refusal at load beats
-silence an hour into the run.
+The format, the validation contract and the rules of writing are specified in
+section 2 of docs/requirements.md. The contract is checked in one pass at load
+time, and any breach refuses the file whole: the alternative is an exception in
+the middle of a session, with the focus in the application under test and NVDA
+suddenly silent. A blind tester sees no traceback, and one clear refusal at
+load beats silence an hour into the run.
+
+**There is no `save`.** Section 2 has every change to the data rewrite the
+whole file at once, with no exceptions and no discipline anywhere about when
+the file reaches the disk — so the change and the write are one operation
+(`record_status`, `record_comment`, `reset`), and nothing here offers a way to
+make the first without the second. A `save()` the shell had to remember to call
+would be that discipline, and the deferred write it invites is what section 2
+paid off when the double press of the space bar went away.
+
+**What is written is the document that was read.** Saving mutates the parsed
+structure rather than assembling a fresh one out of the fields this module
+knows, which is what keeps unknown fields alive: without it the first press of
+the space bar would erase whatever an author or an agent had written into the
+file alongside them.
 
 **Why the refusal carries no text.** Section 2 wants one source of the reason
 for the whole add-on, and section 4 sends it to two places: a short spoken
@@ -25,7 +39,7 @@ it into a sentence, still from one table. Nothing here is ever shown to anyone.
 import dataclasses
 import enum
 import json
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from pathlib import Path
 from typing import Any, TypeGuard, cast
 
@@ -107,11 +121,19 @@ class ChecklistError(Exception):
 
 
 class Item:
-	"""One thing to check."""
+	"""One thing to check.
 
-	def __init__(self, data: dict[str, Any]) -> None:
+	`rewrite` puts the whole checklist on disk. Every method here that changes
+	the item calls it, because section 2 knows no other moment at which a
+	change reaches the file. The item is handed the call rather than the
+	checklist so that it needs to know only that its changes are made durable,
+	not by whom or where.
+	"""
+
+	def __init__(self, data: dict[str, Any], rewrite: Callable[[], None]) -> None:
 		super().__init__()
 		self._data = data
+		self._rewrite = rewrite
 
 	@property
 	def id(self) -> int:
@@ -152,17 +174,44 @@ class Item:
 		state with one canonical form, so that no consumer has to ask whether
 		the string it got is really there.
 		"""
-		comment = self._data.get("comment")
-		return comment if comment is not None and comment.strip() else None
+		return _text(self._data.get("comment"))
+
+	def record_status(self, value: str) -> None:
+		"""Give the item this status and rewrite the file at once (section 2).
+
+		A value outside the five is a programming error rather than a refusal.
+		Nothing in the shell can produce one — the combo box of the item dialog
+		is read-only precisely so that a typo cannot (section 3.3.1) — and
+		writing one would leave a file the add-on can no longer open, because
+		section 2 makes an unrecognised status fatal on read.
+		"""
+		if value not in status.STATUSES:
+			raise ValueError(f"not a status of the format: {value!r}")
+		self._data["status"] = value
+		self._rewrite()
+
+	def record_comment(self, value: str | None) -> None:
+		"""Give the item this comment and rewrite the file at once (section 2).
+
+		`None` erases it, and so does a comment that is empty or nothing but
+		whitespace: section 2 has one state there, and `_text` is the one place
+		that decides what counts as a comment at all.
+		"""
+		_set_comment(self._data, value)
+		self._rewrite()
 
 
 class Section:
-	"""A named group of items."""
+	"""A named group of items.
 
-	def __init__(self, data: dict[str, Any]) -> None:
+	`rewrite` is the same call the items were given; see `Item`.
+	"""
+
+	def __init__(self, data: dict[str, Any], rewrite: Callable[[], None]) -> None:
 		super().__init__()
 		self._data = data
-		self._items = [Item(item) for item in data["items"]]
+		self._rewrite = rewrite
+		self._items = [Item(item, rewrite) for item in data["items"]]
 
 	@property
 	def name(self) -> str:
@@ -174,6 +223,21 @@ class Section:
 		"""The items of this section, in the order the file lists them."""
 		return self._items
 
+	def reset(self) -> None:
+		"""Put every item back to `pending`, erase every comment, write once.
+
+		Section 3.2.2 erases the comments along with the statuses: one that
+		outlived a reset would hang on an unchecked item claiming "failed,
+		because X" — and it would be spoken, so it is not dead data but
+		misleading data. The note stays; it belongs to the author of the
+		checklist rather than to the run (section 2).
+
+		The whole section is cleared before anything reaches the disk. One
+		command is one rewrite of the file, not one per item.
+		"""
+		_clear(self._data)
+		self._rewrite()
+
 
 class Checklist:
 	"""A checklist file that has passed the validation contract.
@@ -181,12 +245,23 @@ class Checklist:
 	Built by `load` and `loads`, which is where the contract is enforced;
 	handing the constructor a document that has not been through it is a
 	programming error, not a refusal.
+
+	`path` is the file this checklist came from and the file its changes go
+	back to. Only `loads` leaves it unset, because reading a checklist out of a
+	string is the parsing seam rather than a way to hold one: what the add-on
+	works with always came from a file.
 	"""
 
-	def __init__(self, document: dict[str, Any]) -> None:
+	def __init__(self, document: dict[str, Any], path: Path | None = None) -> None:
 		super().__init__()
 		self._document = document
-		self._sections = [Section(section) for section in document["sections"]]
+		self._path = path
+		self._sections = [Section(section, self._rewrite) for section in document["sections"]]
+
+	@property
+	def path(self) -> Path | None:
+		"""The file this checklist was read from, and is written back to."""
+		return self._path
 
 	@property
 	def document(self) -> dict[str, Any]:
@@ -210,20 +285,57 @@ class Checklist:
 		"""The sections of the checklist, in the order the file lists them."""
 		return self._sections
 
+	def reset(self) -> None:
+		"""Put every item of every section back to `pending`, and write once.
+
+		The whole-progress reset of the GUI (section 5). Same rule as resetting
+		one section, and the same reason the comments go with the statuses:
+		what a reset does to a section is written down once, in `_clear`.
+		"""
+		for section in self._document["sections"]:
+			_clear(section)
+		self._rewrite()
+
+	def _rewrite(self) -> None:
+		"""Put the whole checklist on disk, now.
+
+		Every change to the data comes through here, and nothing else does:
+		section 2 admits no deferred write and no other moment at which the
+		file is brought up to date.
+		"""
+		if self._path is None:
+			raise ValueError("this checklist was read from text and has no file to write back to")
+		# `newline` rather than the platform default: the add-on only ever runs
+		# on Windows, but a checklist is a data file that usually lives in
+		# version control beside the product under test, so what it writes is
+		# the same on every machine that reads the repository.
+		self._path.write_text(dumps(self), encoding="utf-8", newline="\n")
+
+
+def dumps(checklist: Checklist) -> str:
+	"""The text of the file the add-on writes for `checklist`.
+
+	Brings the loaded document into the form section 2 calls for and hands it
+	back as text. The document is canonicalised **in place**: saving mutates
+	the structure that was read instead of assembling a fresh one, which is
+	what carries unknown fields through a rewrite. After this the model and the
+	file say the same thing, down to the fields that were left implicit.
+
+	What changes is how the checklist is written down, never what it says: no
+	status, comment, note or text means anything different afterwards. So this
+	is not a change escaping without a write — there is nothing here to write.
+	"""
+	return json.dumps(_canonical(checklist.document), ensure_ascii=False, indent=2) + "\n"
+
 
 def loads(text: str) -> Checklist:
 	"""Read a checklist out of the contents of a file.
 
-	Raises `ChecklistError` if the text is not JSON or breaks the contract.
+	The result has no path and so cannot be changed; `load` is what the add-on
+	itself uses. Raises `ChecklistError` if the text is not JSON or breaks the
+	contract.
 	"""
-	try:
-		document: Any = json.loads(text)
-	except ValueError as error:
-		# Section 4 puts a parse error under the same message as the rest of the
-		# contract, so it may not escape as an exception of the `json` module:
-		# the shell would then have two ways to learn the file did not load.
-		raise _refusal(ProblemKind.NOT_JSON) from error
-	return Checklist(_validated(document))
+	return _read(text, None)
 
 
 def load(path: str | Path) -> Checklist:
@@ -234,18 +346,105 @@ def load(path: str | Path) -> Checklist:
 	file that is not there is answered by section 2 with "Checklist file not
 	found" and a file dialog, not with the reason a file was refused.
 	"""
+	file = Path(path)
 	try:
 		# `utf-8-sig` rather than `utf-8`: checklists are written by hand on
 		# Windows, editors there still put a byte order mark at the front, and
-		# `json` chokes on it. Without a mark the two are the same codec.
-		text = Path(path).read_text(encoding="utf-8-sig")
+		# `json` chokes on it. Without a mark the two are the same codec. The
+		# mark is not written back: `_rewrite` uses plain `utf-8` (section 2).
+		text = file.read_text(encoding="utf-8-sig")
 	except UnicodeDecodeError as error:
 		# A checklist saved in some other encoding is a file that could not be
 		# read, which section 4 answers with the same short message as broken
 		# JSON. Letting the decoder's own exception out would be the silence in
 		# the middle of a session that section 2 exists to prevent.
 		raise _refusal(ProblemKind.NOT_JSON) from error
-	return loads(text)
+	return _read(text, file)
+
+
+def _read(text: str, path: Path | None) -> Checklist:
+	"""Parse and validate `text`, as a checklist stored at `path`."""
+	try:
+		document: Any = json.loads(text)
+	except ValueError as error:
+		# Section 4 puts a parse error under the same message as the rest of the
+		# contract, so it may not escape as an exception of the `json` module:
+		# the shell would then have two ways to learn the file did not load.
+		raise _refusal(ProblemKind.NOT_JSON) from error
+	return Checklist(_validated(document), path)
+
+
+def _canonical(document: dict[str, Any]) -> dict[str, Any]:
+	"""Bring `document` into the form section 2 gives a written file.
+
+	Three rules, and they run over the document itself rather than over a copy
+	of it, so that everything the add-on does not know about stays where the
+	author put it.
+	"""
+	# Written out even when the file never carried it: section 7.1 rests the
+	# whole meaning of the major version number on an old add-on recognising a
+	# newer file, and it has only this field to recognise it by. Section 2 asks
+	# for the version to be explicit, though, not for it to be raised — the
+	# version the file declared is kept. That matters from the first release
+	# that knows two of them: `KNOWN_FORMAT_VERSIONS` is a set because 2.0.0
+	# may still read version 1 files, and restamping one as it saved would be
+	# exactly the silent corruption section 7.1 is built to prevent.
+	#
+	# In a file that had no version the key lands last, after `sections`,
+	# because that is where a plain assignment puts it; moving it to the front
+	# would mean rebuilding the document, and the rule that keeps unknown
+	# fields alive is that the document is never rebuilt.
+	document["format_version"] = document.get("format_version", KNOWN_FORMAT_VERSION)
+	for section in document["sections"]:
+		for item in section["items"]:
+			# Explicitly for every item, `pending` included. Reading treats an
+			# absent field as `pending` all the same, but the tester who opens
+			# the file should find the state of every item written down.
+			item["status"] = item.get("status", status.PENDING)
+			# The deliberate exception to "write it explicitly": a comment the
+			# file carries but that says nothing goes out with the rest.
+			_set_comment(item, item.get("comment"))
+	return document
+
+
+def _text(value: object) -> str | None:
+	"""`value` if it is a string with something in it, and None otherwise.
+
+	The one predicate behind the `comment` rule of section 2: "no comment" and
+	"an empty comment" are one state, so a blank string and an absent field get
+	the same answer everywhere — reading an item, writing the file, and erasing
+	a comment on a reset. Spelling the test out at each place a comment is used
+	is what section 2 forbids.
+	"""
+	if isinstance(value, str) and value.strip():
+		return value
+	return None
+
+
+def _set_comment(item: dict[str, Any], value: object) -> None:
+	"""Put `value` in the comment of `item`, in the one form the format has.
+
+	Anything that is not a string with something in it takes the key out
+	altogether: that is what "no comment" looks like in a file, and it keeps
+	the document from ever holding a shape — a JSON null — that the validation
+	contract would refuse to read back.
+	"""
+	text = _text(value)
+	if text is None:
+		_ = item.pop("comment", None)
+	else:
+		item["comment"] = text
+
+
+def _clear(section: dict[str, Any]) -> None:
+	"""Put every item of `section` back to `pending` and drop its comment.
+
+	Without writing: the caller decides when, and there is exactly one write
+	per command (sections 3.2.2 and 5).
+	"""
+	for item in section["items"]:
+		item["status"] = status.PENDING
+		_set_comment(item, None)
 
 
 @dataclasses.dataclass(frozen=True)
