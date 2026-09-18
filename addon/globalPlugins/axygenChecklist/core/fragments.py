@@ -11,14 +11,10 @@ speech. Section 2 of docs/requirements.md marks them in `text` and `note` with
 single backticks, and the `C` key of the command mode (section 3.2.2) puts one
 in the clipboard.
 
-**The convention lives in the text, not in a field of its own.** An exact string
-does not survive being read aloud: a backslash is silent at NVDA's usual
-settings and a dot comes out as the word "dot", so `.\\app.exe` reaches the ear
-as the bare name of the application — the very thing the item was telling the
-tester not to type. Section 2 weighs an array of fragments beside the text and
-refuses it: it would either repeat a string the sentence already carries, and
-part company with it on the first edit, or force the sentence to be rewritten,
-after which converting a handwritten checklist stops being mechanical.
+**The convention lives in the text**, rather than in a field of its own listing
+the fragments beside it. Section 2 weighs that field and rejects it, and says
+why; what follows from it here is that finding a fragment is a matter of
+reading a string, so that is all this module does.
 
 **Nothing here can refuse a file.** An odd delimiter, an empty pair, a delimiter
 in the middle of a word — all of it is ordinary text. `text` is the user's data,
@@ -26,28 +22,22 @@ and section 2 gives the add-on no right to refuse a checklist over a stray
 backtick. So this module has no errors to raise and no opinion to hold: whatever
 it is handed, it hands back the fragments it found in it, however few.
 
-**The delimiters are not stripped from the text.** They are part of `text`, and
-everything that shows the text shows them — speech, braille, the item dialog,
-the tree of the GUI window, the report. Taking them off on the way out would
-mean a point of transformation in every one of those places; and a delimiter
-that can be seen is itself the hint that there is something here to copy.
+**What comes out carries no delimiters, and the text keeps its own.** They are
+part of `text`, and everything that shows the text shows them (section 2); the
+stripping happens here because a fragment is on its way to the clipboard, which
+is the one place the delimiters would be wrong.
 
 What a fragment is settled here; which fields of an item are read for them is a
 fact about an item and is settled by `checklist.Item.fragments`.
 """
 
-#: What marks a fragment in `text` and `note`.
+#: What marks a fragment in `text` and `note`. Section 2 chooses the character
+#: and weighs the alternatives it rejects.
 #:
-#: A backtick because the criterion is mechanical: the delimiter stands inside a
-#: spoken sentence, so it must not be heard. Both `symbols.dic` files give it
-#: level `most` while the usual `speech.symbolLevel` is `some`, so neither
-#: locale speaks it by default. It also never occurs inside the things testers
-#: paste — not in a URL, a path, an identifier or a command — and needs no
-#: escaping in JSON. Section 2 weighs the alternatives and says why each fails.
-#:
-#: Section 7.1 counts this character as part of the version contract: authors
-#: write files against it, so changing it is a MAJOR — a file that used to yield
-#: fragments would quietly stop yielding them.
+#: It is named here rather than spelled inline because section 7.1 counts it as
+#: part of the version contract: authors write files against this character, so
+#: changing it is a MAJOR — a file that used to yield fragments would quietly
+#: stop yielding them.
 DELIMITER = "`"
 
 
@@ -62,9 +52,12 @@ def of(*sources: str | None) -> list[str]:
 	found: dict[str, None] = {}
 	# Line by line, because section 2 forbids a fragment to cross a line break:
 	# a delimiter looks for its pair on its own line and nowhere else.
-	# `splitlines` rather than a split on "\n" so that every break Python knows
-	# counts as one — what reaches the clipboard has to be a single line
-	# whichever character ended the one before it.
+	#
+	# `splitlines` breaks on more than the "\n" and CRLF section 2 has in mind —
+	# on every separator Python counts as a line break. That is deliberately the
+	# generous direction: the rule is there so that what reaches the clipboard
+	# is one line, and a fragment straddling some rarer separator would break
+	# that just as thoroughly. Erring the other way would let one through.
 	for source in sources:
 		for line in (source or "").splitlines():
 			for fragment in _in_line(line):

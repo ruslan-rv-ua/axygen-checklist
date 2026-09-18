@@ -11,13 +11,18 @@ import unittest
 from core import checklist, fragments
 
 
-def item(**fields: str) -> checklist.Item:
-	"""One item carrying `fields`, read through the ordinary load pass."""
+def loaded(**fields: str) -> checklist.Checklist:
+	"""A checklist of one item carrying `fields`, read through the load pass."""
 	document = {
 		"checklist_name": "Base checklist",
 		"sections": [{"section_name": "Controls", "items": [{"id": 1, "text": "An item", **fields}]}],
 	}
-	return checklist.loads(json.dumps(document)).sections[0].items[0]
+	return checklist.loads(json.dumps(document))
+
+
+def item(**fields: str) -> checklist.Item:
+	"""The one item of `loaded`, for the tests that need no file around it."""
+	return loaded(**fields).sections[0].items[0]
 
 
 class TestPairs(unittest.TestCase):
@@ -185,19 +190,5 @@ class TestValidation(unittest.TestCase):
 		self.assertEqual(loaded.text, "Open `http://localhost:8080` now")
 
 	def test_a_rewrite_leaves_the_delimiters_where_they_were(self):
-		written = checklist.dumps(
-			checklist.loads(
-				json.dumps(
-					{
-						"checklist_name": "Base checklist",
-						"sections": [
-							{
-								"section_name": "Controls",
-								"items": [{"id": 1, "text": "Open `http://localhost:8080` now"}],
-							},
-						],
-					},
-				),
-			),
-		)
+		written = checklist.dumps(loaded(text="Open `http://localhost:8080` now"))
 		self.assertIn('"text": "Open `http://localhost:8080` now"', written)

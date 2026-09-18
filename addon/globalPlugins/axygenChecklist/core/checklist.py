@@ -187,9 +187,9 @@ class Item:
 
 		Section 2 collects them from `text` and then `note`, and from `comment`
 		never: that field belongs to the tester, and text is copied out of it
-		from the item dialog instead. Which fields they come from is a fact
-		about an item, so it is settled here; what a fragment *is* belongs to
-		`fragments` and is settled there.
+		from the item dialog instead. Which fields they are collected from is a
+		fact about an item, so it is settled here; what a fragment *is* is
+		settled in the `core.fragments` module, over bare strings.
 		"""
 		return fragments.of(self.text, self.note)
 
