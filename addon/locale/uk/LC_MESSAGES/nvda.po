@@ -33,6 +33,12 @@ msgstr[0] "Чекліст завершено! Опрацьовано {count} п�
 msgstr[1] "Чекліст завершено! Опрацьовано всі {count} пункти"
 msgstr[2] "Чекліст завершено! Опрацьовано всі {count} пунктів"
 
+#. Translators: Spoken for the current section of the checklist: its name, how many
+#. of its items carry a verdict, and how many it holds in all.
+#, python-brace-format
+msgid "Section: {name}, {processed} of {total} processed"
+msgstr "Розділ: {name}, опрацьовано {processed} з {total}"
+
 #. Translators: Added after a count of checklist items when some of them failed,
 #. running straight on from it: "All 12 items processed, 2 failed".
 #, python-brace-format
@@ -56,6 +62,16 @@ msgid ""
 msgstr ""
 "Позначає поточний пункт чекліста пройденим, а вже пройдений повертає в «не "
 "перевірено»"
+
+#. Translators: The description of a command, as it appears in NVDA's Input Gestures dialog.
+msgid "Arms the command mode of the checklist for three seconds"
+msgstr "Озброює режим команд чекліста на три секунди"
+
+#. Translators: The description of a command, as it appears in NVDA's Input Gestures dialog.
+msgid ""
+"Reads the name of the current section of the checklist and the progress "
+"through it"
+msgstr "Озвучує назву поточного розділу чекліста та прогрес у ньому"
 
 #. Add-on description
 #. Translators: Long description to be shown for this add-on on add-on information from add-on store

@@ -21,7 +21,33 @@ only `scriptHandler.getLastScriptRepeatCount()`: NVDA runs the script on every
 press of a series without waiting for the series to end, and the interval it
 counts is the user's own `multiPressTimeout`. Measuring the time between calls
 ourselves is forbidden, and would hard-code a setting that belongs to the
-screen reader.
+screen reader. The command mode is not a series and does not ask (section 6);
+`commandmode` counts its own three seconds and says why.
+
+**Every script here drops the command mode before it does anything else**, and
+that one line is the whole of section 3.2.3: any command of the add-on but a
+key of the armed mode takes the mode away and then runs as usual, announcing
+nothing of its own about it. A `NVDA+Alt+PageDown` that said *"Cancelled"*
+first would be reporting an action the tester never took. The line stands in
+the scripts rather than in the methods below them because it is about the
+gesture that arrived, not about the work that follows it. `script_armCommandMode`
+is the one script without the line written out, and it is not an exception:
+`arm` drops what it finds before taking the keys again, which is the same rule
+reaching the same end.
+
+A decorator would carry the rule better than six copies of a line, and one was
+tried: a wrapper cannot reach `self._mode` from module scope without pyright's
+`reportPrivateUsage`, which the type check CI runs in strict mode, and a
+public method on the plugin existing only to be wrapped would be worse than
+the line it saved.
+
+**A blocked command is not a command that ran**, so it leaves the mode alone.
+`blockAction.when` is the inner decorator and returns before the body, which
+is deliberate: while a modal window of the add-on is open the mode cannot be
+armed in the first place (arming is blocked too), and a command refused under
+someone else's dialog has not executed, so consuming the mode on its behalf
+would be inventing an action. The mode then ends the way it would have anyway,
+on its own timer.
 
 **The position reaches the disk whenever a command moves it.** Section 2 keeps
 it in `state.json` — navigation included, not only where a status is being
@@ -59,6 +85,7 @@ of section 5 — is still to come; until it arrives, the file named in
 `state.json` is the only one the add-on can have.
 """
 
+from collections.abc import Callable
 from pathlib import Path
 
 import addonHandler
@@ -77,7 +104,7 @@ from gui import blockAction
 from logHandler import log
 from scriptHandler import script
 
-from . import signals, wording
+from . import commandmode, signals, wording
 from .core import checklist, navigation, progress, session, status
 from .core.checklist import Checklist
 from .core.navigation import Direction, Position, Step
@@ -91,6 +118,36 @@ addonHandler.initTranslation()
 #: around this file is already obliged to be named after.
 _CONFIG_FOLDER = "axygenChecklist"
 
+#: The status each digit of the command mode assigns, by the gesture carrying
+#: it: 1 passed, 2 failed, 3 blocked, 4 skipped, 5 pending (section 3.2.2).
+#: Read off the one ordering of the statuses rather than written out a second
+#: time, so that the digits cannot drift from the combo box of the item dialog,
+#: which takes its order from the same tuple.
+#:
+#: These identifiers are **looked up** as well as bound — `_digit_status` asks
+#: an arriving gesture which digit it is — so they are normalized here, in the
+#: form `normalizedIdentifiers` will offer them. The letters of `_MODE_KEYS`
+#: below are only ever bound, and `bindGesture` normalizes for itself.
+#:
+#: Letters, not punctuation, and digits are safe for the same reason (section
+#: 3.2.2): `A`–`Z` and the digits keep their virtual key codes in every layout,
+#: while `[`, `]`, `,` and `.` move with it, so a gesture written with one
+#: would stop being the same gesture when the tester switches to Ukrainian.
+_DIGIT_STATUSES = {
+	inputCore.normalizeGestureIdentifier(f"kb:{digit}"): value
+	for digit, value in enumerate(status.STATUSES, start=1)
+}
+
+#: What the command mode binds while it is armed: a gesture identifier to the
+#: name of the script it runs (section 3.2.2). Only the keys built so far stand
+#: here — the rest of the table in the specification arrives with the commands
+#: behind them — and none of them costs anything in the global space, which is
+#: the currency the whole construction is bought with.
+_MODE_KEYS = {
+	**{identifier: "setStatus" for identifier in _DIGIT_STATUSES},
+	"kb:p": "speakSectionProgress",
+}
+
 
 def _state_file() -> Path:
 	"""Where the position is kept between runs of NVDA (section 2).
@@ -100,6 +157,21 @@ def _state_file() -> Path:
 	beside its own configuration.
 	"""
 	return Path(NVDAState.WritePaths.configDir) / _CONFIG_FOLDER / "state.json"
+
+
+def _digit_status(gesture: inputCore.InputGesture) -> str | None:
+	"""Which status the digit that raised `gesture` stands for, or None for neither.
+
+	The five digits share one script (section 3.5), so the script is handed the
+	gesture and asks it which of them arrived. A keyboard gesture carries both
+	the layout-qualified identifier and the plain one, and the plain one is
+	what the mode bound.
+	"""
+	for identifier in gesture.normalizedIdentifiers:
+		value = _DIGIT_STATUSES.get(identifier)
+		if value is not None:
+			return value
+	return None
 
 
 class GlobalPlugin(globalPluginHandler.GlobalPlugin):
@@ -132,6 +204,9 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 		#: Scratch for the length of one series, and read only on a press that
 		#: has a press of its own before it.
 		self._anchor = Position(0, 0)
+		#: The temporary layer the rare commands live behind (section 3.2.2).
+		#: Not armed until `NVDA+Alt+O` arms it, and never arming itself.
+		self._mode = commandmode.CommandMode(self, _MODE_KEYS)
 		#: Where the position between runs of NVDA is kept (section 2).
 		self._state = _state_file()
 		#: What the restore has to say, until there is anyone to hear it. None
@@ -141,12 +216,19 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 		log.info("Axygen Checklist loaded")
 
 	def terminate(self) -> None:
-		"""NVDA is done with this plugin: let go of the start-up handler.
+		"""NVDA is done with this plugin: let go of the timer and the handler.
 
-		The extension point holds bound methods weakly and would drop this one
-		on its own, but only whenever the plugin is collected. Saying so here
-		makes it the moment NVDA names for it.
+		The extension point holds bound methods weakly and would drop the
+		start-up handler on its own, but only whenever the plugin is collected.
+		Saying so here makes it the moment NVDA names for it.
+
+		The command mode has to go for a harder reason. A `wx.CallLater` left
+		running holds this plugin alive and fires into it afterwards — after a
+		reload of the plugins (`NVDA+Ctrl+F3`), that is a tone from an add-on
+		that no longer exists, and gestures taken off an object nobody is
+		listening to any more.
 		"""
+		self._mode.disarm()
 		postNvdaStartup.unregister(self._announce_restore)
 		super().terminate()
 
@@ -213,6 +295,7 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 	)
 	@blockAction.when(blockAction.Context.MODAL_DIALOG_OPEN)
 	def script_nextItem(self, gesture: inputCore.InputGesture) -> None:
+		self._mode.disarm()
 		self._navigate(Direction.FORWARD)
 
 	@script(
@@ -224,6 +307,7 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 	)
 	@blockAction.when(blockAction.Context.MODAL_DIALOG_OPEN)
 	def script_previousItem(self, gesture: inputCore.InputGesture) -> None:
+		self._mode.disarm()
 		self._navigate(Direction.BACKWARD)
 
 	@script(
@@ -241,7 +325,8 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 		# therefore never one accidental double tap away from anything
 		# destructive. Resetting a section lives behind the command mode and a
 		# Yes/No dialog instead.
-		self._toggle_status()
+		self._mode.disarm()
+		self._record_status(status.toggled)
 
 	@script(
 		description=_(
@@ -252,6 +337,7 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 	)
 	@blockAction.when(blockAction.Context.MODAL_DIALOG_OPEN)
 	def script_readItem(self, gesture: inputCore.InputGesture) -> None:
+		self._mode.disarm()
 		# Every press reads the item, the second one included. Section 3.3 gives
 		# the second press the item dialog, which is not built yet, and the one
 		# thing this may not do meanwhile is fall silent: NVDA cancels speech on
@@ -263,6 +349,70 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 			return
 		loaded, position = standing
 		self._speak(loaded, position)
+
+	@script(
+		description=_(
+			# Translators: The description of a command, as it appears in NVDA's Input Gestures dialog.
+			"Arms the command mode of the checklist for three seconds",
+		),
+		gesture="kb:NVDA+alt+o",
+	)
+	@blockAction.when(blockAction.Context.MODAL_DIALOG_OPEN)
+	def script_armCommandMode(self, gesture: inputCore.InputGesture) -> None:
+		# `getLastScriptRepeatCount` is not asked here either, and here section 6
+		# forbids it outright: the mode lives longer than `multiPressTimeout`, so
+		# NVDA would have called the second press the first of a new series
+		# anyway. A second `NVDA+Alt+O` without letting the modifiers go is
+		# therefore what section 3.2.3 makes of any command of the add-on — the
+		# mode dropped, the command run as usual — and running this one as usual
+		# is arming it again, tone and all. `arm` drops what it finds first.
+		#
+		# No checklist is asked for, unlike every other command. The mode is a
+		# shell, and each key inside it answers for itself; refusing to arm
+		# without a file would put `O`, the one command that opens a file, behind
+		# having opened one.
+		self._mode.arm()
+
+	@script()
+	@blockAction.when(blockAction.Context.MODAL_DIALOG_OPEN)
+	def script_setStatus(self, gesture: inputCore.InputGesture) -> None:
+		# No description, and that is exactly what keeps the five digits out of
+		# the Input Gestures dialog (section 3.5). NVDA lists a script by its
+		# `__doc__`, which the decorator sets from `description`, and skips the
+		# ones that have none — so the empty decorator is the requirement rather
+		# than an oversight, and it holds whatever anyone writes below it. They
+		# are not five commands but five variants of one, and five rows in that
+		# list would cost more than they gave.
+		self._mode.disarm()
+		value = _digit_status(gesture)
+		if value is None:
+			# Unreachable through the add-on: the mode binds these five and the
+			# dialog cannot add a sixth. A gesture written into `gestures.ini` by
+			# hand could still arrive, and there is no status to assign and
+			# nothing worth saying out loud about it.
+			log.error(f"no status behind the command mode gesture {gesture.normalizedIdentifiers}")
+			return
+		# The honest repeat of section 4: a digit assigns the status outright and
+		# may be pressed as often as the tester likes, where the space bar would
+		# toggle away from it. So nothing here asks whether the status is already
+		# the one being assigned — the write and the word happen either way.
+		self._record_status(lambda _current: value)
+
+	@script(
+		description=_(
+			# Translators: The description of a command, as it appears in NVDA's Input Gestures dialog.
+			"Reads the name of the current section of the checklist and the progress through it",
+		),
+	)
+	@blockAction.when(blockAction.Context.MODAL_DIALOG_OPEN)
+	def script_speakSectionProgress(self, gesture: inputCore.InputGesture) -> None:
+		# No gesture of its own: this one lives behind the command mode, and
+		# section 3.5 has it stand in the Input Gestures dialog with an empty
+		# binding all the same — reachable through the mode, and available to
+		# anyone who would rather give it a key. Without that, moving a command
+		# into the mode would take its rebinding away along with its hotkey.
+		self._mode.disarm()
+		self._speak_progress()
 
 	def _navigate(self, direction: Direction) -> None:
 		"""Move one item, or — on the second press of the series — one section.
@@ -347,11 +497,37 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 		section = navigation.section_at(loaded, position).name if name_the_section else None
 		ui.message(wording.spoken_item(navigation.item_at(loaded, position), section))
 
-	def _toggle_status(self) -> None:
-		"""Mark the current item passed, or put it back to unchecked (section 3.2.1).
+	def _speak_progress(self) -> None:
+		"""Say which section the tester is in and how far it has got (section 3.3).
 
-		The rule is total and lives in `core.status`: `passed` goes back to
-		`pending`, and any of the other four becomes `passed`.
+		The `P` key of the command mode. It is asked from nowhere in particular,
+		which is why it names the section out loud where a jump between sections
+		does not (section 3.1), and it counts the **whole** section however the
+		filter is set (section 3.4). Nothing is written and nothing moves: the
+		command answers "where am I?" and leaves everything as it found it.
+		"""
+		standing = self._standing()
+		if standing is None:
+			return
+		loaded, position = standing
+		section = navigation.section_at(loaded, position)
+		ui.message(wording.spoken_progress(section.name, progress.of(section.items)))
+
+	def _record_status(self, rule: Callable[[str], str]) -> None:
+		"""Give the current item the status `rule` makes of the one it holds.
+
+		The two ways a status is assigned without opening a window meet here and
+		differ only in `rule`, which is handed the status standing in the file
+		and answers with the one to write. The quick toggle passes the total
+		rule of section 3.2.1, which reads what it is replacing: `passed` goes
+		back to `pending`, and any of the other four becomes `passed`. A digit
+		of the command mode passes the status it stands for and ignores what was
+		there (section 3.2.2). Everything after that is the same rule of section
+		4 applied to both, which is why they are one method rather than two.
+
+		Not called `verdict`: that word is taken, and taken narrowly — a verdict
+		is any status but `pending` (`core.status.is_verdict`), and one of the
+		two callers here is the digit that puts an item back to `pending`.
 
 		**The file is written first and the verdict spoken second** (section 4).
 		Reversed, a failure would arrive after the word it contradicts, where
@@ -377,7 +553,7 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 		loaded, position = standing
 		item = navigation.item_at(loaded, position)
 		try:
-			item.record_status(status.toggled(item.status))
+			item.record_status(rule(item.status))
 		except OSError:
 			log.error(f"could not write the checklist to {loaded.path}", exc_info=True)
 			ui.message(wording.spoken_write_failure())

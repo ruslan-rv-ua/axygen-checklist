@@ -198,6 +198,30 @@ def spoken_completion(counted: Progress) -> str:
 	return spoken.format(count=counted.total) + _failures(counted.failed)
 
 
+def spoken_progress(section_name: str, counted: Progress) -> str:
+	"""How far the run has got through one section (section 3.3).
+
+	What the `P` key of the command mode answers, and the reason it names the
+	section out loud while a jump between sections does not (section 3.1): `P`
+	is asked from nowhere in particular — "where am I?" — whereas a jump has
+	just said where it went. The label is what makes the name an answer rather
+	than a word the tester has to place.
+
+	`counted` is taken over the **whole** section whatever the filter is doing
+	(section 3.4). Counting only what is on show would say "0 of 1 processed"
+	in a section the tester has nearly finished.
+
+	Neither number needs a plural form of its own (section 6): they stand on
+	their own rather than in front of a noun, and it is the noun that would
+	have to agree with them.
+	"""
+	# Translators: Spoken for the current section of the checklist: its name, how many
+	# of its items carry a verdict, and how many it holds in all.
+	spoken = _("Section: {name}, {processed} of {total} processed")
+	counts = spoken.format(name=section_name, processed=counted.processed, total=counted.total)
+	return counts + _failures(counted.failed)
+
+
 def _failures(count: int) -> str:
 	"""The clause naming failures, and nothing at all when there were none.
 

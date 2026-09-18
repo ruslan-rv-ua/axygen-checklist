@@ -12,11 +12,16 @@ falling away on its own timeout, the edge of the list and the checklist being
 finished — **must be audibly different from one another**. That is a property
 of the set rather than of any one of them, so the set lives in one module and
 nothing else calls `tones.beep` directly. Picking a tone that differs from
-three others is only possible with the three in front of you, and this is where
-they will be.
+three others is only possible with the three in front of you, and here they
+are, all four of them.
 
-Two of the four arrive with the command mode that raises them (section 3.2.2);
-the two here are the edge of the list and the end of the run.
+What they are picked on is pitch **and** length together, because two of them
+have to say "the same thing, the other way round": arming the command mode and
+the mode falling away are an octave apart, which is the clearest way a tone can
+be heard as its own lower echo, and the specification asks for the second to be
+the lower one. The other two then stay clear of both pitches and of each other
+by length as well — the edge of the list is the lowest and short, the end of
+the run is the only long tone of the four.
 
 **A tone and not speech, on purpose.** NVDA cancels speech when a gesture is
 executed (`speechEffectWhenExecuted` in `inputCore.executeGesture`), so a
@@ -44,12 +49,37 @@ def list_boundary() -> None:
 def checklist_finished() -> None:
 	"""Nothing is still pending: the run is over (section 4).
 
-	High and long, which is what tells it apart from the edge of the list —
-	the only other signal built so far, and the low short one. The two that
-	arrive with the command mode are short as well (section 3.2.2), so this
-	stays the only long tone of the four and the only one above the middle.
-
-	Once a run, against the boundary's many times a run, and it carries news
-	worth stopping for rather than a refusal to step further.
+	The only long tone of the four, and that alone would tell it apart; it also
+	sits between the two of the command mode, far enough from each to be
+	neither. Once a run, against the boundary's many times a run, and it
+	carries news worth stopping for rather than a refusal to step further.
 	"""
 	tones.beep(880, 200)
+
+
+def command_mode_armed() -> None:
+	"""The command mode has the keys: `NVDA+Alt+O` (section 3.2.2).
+
+	The highest of the four, and as short as anything here gets — a click
+	rather than a note, because it is heard on the way into a command and the
+	tester is already reaching for the next key. Its own echo below is the same
+	length, which is what makes the pair a pair, so pitch is what separates
+	them. It is the whole of what arming announces: a list of the
+	fourteen commands would outlast the three seconds it was being read for
+	(section 3.2.2), and a tone is what survives the keypress that follows,
+	since NVDA cancels speech on every gesture and not this.
+	"""
+	tones.beep(1200, 40)
+
+
+def command_mode_expired() -> None:
+	"""Three seconds are up and the mode has let the keys go (section 3.2.2).
+
+	An octave below the arming tone and the same length, so the pair is heard
+	as one thing arriving and the same thing leaving. Without it the mode ends
+	in silence and the next letter goes to the application under test; it
+	stands where the word *"Cancelled"* used to (section 3.2.3), and it sounds
+	only for the timeout — a mode dropped by a command of the add-on says
+	nothing at all.
+	"""
+	tones.beep(600, 40)
