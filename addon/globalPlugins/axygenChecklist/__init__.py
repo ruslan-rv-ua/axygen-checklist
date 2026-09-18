@@ -312,21 +312,32 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 		given, and that dialog is what the tester would open with their first
 		command anyway.
 
-		The warning is spoken before the window and may not survive it: NVDA
-		cancels speech when the foreground changes (section 6), and the file
-		dialog announcing itself is such a change. `ui.delayedMessage` would
-		only push the phrase further into the window's way. The order is the
-		one section 2 asks for, and how much of it is heard is down for a
-		listen on a real build.
+		**The warning that comes with a window goes out through `modal.message`**,
+		and that was found by ear rather than reasoned out: spoken through
+		`ui.message` it did not survive at all. NVDA cancels speech when the
+		foreground changes (section 6), and a window opening is such a change,
+		so the phrase was cut off by the file dialog announcing itself.
+		`ui.delayedMessage` is the answer NVDA gives its own messages around a
+		window, and its delay is one millisecond — not a wait for anything, but
+		a turn of the event loop: the phrase is queued **after** the pending
+		foreground event has done its cancelling, and at `Spri.NOW`, so nothing
+		queued in front of it stands in its way. The same call carries it to
+		braille, which matters here more than anywhere: this message is the
+		whole explanation of a window the tester did not ask for.
+
+		A failure with no window keeps `ui.message` (section 4). There is
+		nothing about to cancel it, and delaying it would buy nothing.
 		"""
 		failure = self._startup_failure
 		if failure is None:
 			return
 		# Cleared before anything is said, so that nothing here can be owed twice.
 		self._startup_failure = None
-		ui.message(failure.message)
-		if failure.choose_a_file:
-			self._choose_checklist()
+		if not failure.choose_a_file:
+			ui.message(failure.message)
+			return
+		modal.message(failure.message)
+		self._choose_checklist()
 
 	@script(
 		description=_(
