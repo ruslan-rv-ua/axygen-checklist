@@ -3,9 +3,11 @@
 # This file is covered by the GNU General Public License version 2 or later.
 # See the file COPYING.txt for more details.
 
-"""The words the add-on says about a checklist item.
+"""The words the add-on says, where saying them twice would be a defect.
 
-Two things live here, and the first is the reason the second does.
+A fixed sentence spoken in one place stays in that place. What lives here is
+what is built out of data, or said from more than one window — the strings
+section 2 and section 4 insist on keeping to a single source.
 
 **The status dictionary, on the side of it that is a word.** Section 2 of
 docs/requirements.md keeps the statuses as a single table for the whole add-on:
@@ -27,12 +29,18 @@ GUI tree, where the status stands in front of the text (section 5). A tree is
 scanned down the page and the prefix filters it by ear from the first syllable;
 here there is only the one item, and its text matters more than the verdict on
 it.
+
+**Why a file was refused.** Section 2 wants one source of that text for the
+whole add-on: the short spoken form belongs here, beside the statuses, because
+it is said from wherever a checklist is opened — at start-up from `state.json`
+(section 2), by the file dialog and by the GUI (sections 3.2.2 and 5). The core
+names the breach and never words it; see `core/checklist.py`.
 """
 
 import addonHandler
 
 from .core import status
-from .core.checklist import Item
+from .core.checklist import Item, Problem, ProblemKind
 
 addonHandler.initTranslation()
 
@@ -100,3 +108,32 @@ def spoken_item(item: Item, section_name: str | None = None) -> str:
 	if section_name is not None:
 		sentences.insert(0, section_name)
 	return ". ".join(sentences)
+
+
+def spoken_refusal(problem: Problem | None = None) -> str:
+	"""What the tester hears when a checklist would not load (section 4).
+
+	Four words for every breach of the validation contract, and a sentence of
+	its own for the one breach that sends the tester somewhere else: a
+	`format_version` from a later release means the add-on is old rather than
+	the file broken, and "Error reading the file" would send them hunting for
+	damage that is not there (section 2). Both are equally short; they differ
+	only in where they send the person who hears them.
+
+	`problem` is None when the file never got as far as being judged — it could
+	not be opened at all. Section 2 puts that under the same four words: which
+	encoding the author had in mind, or why the file would not open, is not
+	something the add-on can say.
+
+	This is the short spoken form, which section 4 allows only where the file
+	loaded without the user asking for it. When the user has just picked the
+	file themselves, the reason shown is the concrete one — which field, which
+	item, which value — and it is built from the same `Problem`.
+	"""
+	if problem is not None and problem.kind is ProblemKind.FUTURE_FORMAT:
+		# Translators: Spoken when a checklist file was written by a newer version of
+		# the add-on than the one running, which cannot know what is in it.
+		return _("This file was created by a newer version of the add-on")
+	# Translators: Spoken when a checklist file cannot be read, or holds something
+	# that is not a valid checklist.
+	return _("Error reading the file")

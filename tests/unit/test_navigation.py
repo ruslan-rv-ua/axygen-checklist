@@ -213,3 +213,59 @@ class TestVisibility(unittest.TestCase):
 		document = loaded(["pending", "passed", "pending"])
 		found = navigation.scan(document, Position(0, 1), FORWARD, ITEM, pending_only)
 		self.assertEqual(found, Position(0, 2))
+
+
+class TestResuming(unittest.TestCase):
+	"""Where the tester stands when a checklist is opened (section 2).
+
+	The remembered position comes out of `state.json`, which section 7.1 calls
+	an internal cache: it holds indices, and the file it indexes into is edited
+	by its author between sessions. So the position it names may no longer be a
+	place at all, and this is where that is decided.
+
+	No visibility predicate is asked for, and that is not an oversight. Section
+	3.4 states outright that the item the tester stands on need not satisfy the
+	predicate; opening a file is not navigation, and landing "nowhere" because
+	the filter happened to be on would be a state the add-on has no answer for.
+	"""
+
+	def test_a_remembered_position_is_where_the_tester_stands_again(self):
+		document = loaded(["pending", "pending"], ["pending"])
+		self.assertEqual(navigation.resume(document, Position(1, 0)), Position(1, 0))
+
+	def test_a_checklist_opened_with_nothing_remembered_starts_at_the_first_item(self):
+		document = loaded(["pending", "pending"])
+		self.assertEqual(navigation.resume(document, None), Position(0, 0))
+
+	def test_the_first_item_may_lie_past_a_section_that_holds_none(self):
+		document = loaded([], ["pending"])
+		self.assertEqual(navigation.resume(document, None), Position(1, 0))
+
+	def test_a_position_past_the_end_of_a_shortened_section_starts_over(self):
+		# Section 2: the file was edited between sessions and is now shorter
+		# than the indices remembered of it. Trimming them to the nearest index
+		# that still exists is rejected there — the structure they described is
+		# gone, and stopping "nearby" would fake a precision they have lost.
+		document = loaded(["pending"], ["pending"])
+		self.assertEqual(navigation.resume(document, Position(1, 4)), Position(0, 0))
+
+	def test_a_position_past_the_last_section_starts_over(self):
+		document = loaded(["pending", "pending"])
+		self.assertEqual(navigation.resume(document, Position(3, 0)), Position(0, 0))
+
+	def test_a_position_in_a_section_that_has_been_emptied_starts_over(self):
+		document = loaded(["pending"], [])
+		self.assertEqual(navigation.resume(document, Position(1, 0)), Position(0, 0))
+
+	def test_a_position_that_is_not_an_index_at_all_starts_over(self):
+		# Negative indices are legal Python and count from the end of a list,
+		# so one reaching here would stand somewhere real and wrong.
+		document = loaded(["pending", "pending"])
+		self.assertEqual(navigation.resume(document, Position(0, -1)), Position(0, 0))
+
+	def test_a_checklist_holding_no_items_at_all_has_nowhere_to_stand(self):
+		# Section 2 asks for at least one section and never for a minimum of
+		# items, so this file is valid and there is no position in it.
+		document = loaded([], [])
+		self.assertIsNone(navigation.resume(document, None))
+		self.assertIsNone(navigation.resume(document, Position(0, 0)))

@@ -23,28 +23,76 @@ counts is the user's own `multiPressTimeout`. Measuring the time between calls
 ourselves is forbidden, and would hard-code a setting that belongs to the
 screen reader.
 
-**The position does not reach the disk yet.** Section 2 has it written to
-`state.json` on every change, navigation included, so that a restart of the
-screen reader puts the tester back where they stopped. Nothing here can load a
-checklist either, so the two arrive together with `state.json` and the file
-dialog; until then the commands have nothing to work on and say so.
+**The position reaches the disk whenever a command moves it.** Section 2 keeps
+it in `state.json` — navigation included, not only where a status is being
+written beside it — so that a restart of the screen reader puts the tester back
+where they stopped. `_remember` is the one place that writes, and that is the
+whole of the discipline: there is no other moment at which the file is brought
+up to date, as there is none for the checklist. Reading the position back is
+not a change and writes nothing; `_restore` says what that buys.
+
+**The restore happens on construction; only its failures wait.** Reading the
+file is the first thing this plugin does, so that a reload of the plugins
+(`NVDA+Ctrl+F3`) comes back holding the same checklist. What cannot happen that
+early is speech: at start-up NVDA is still announcing itself and the window in
+focus, and a message spoken into that would be cut off by it. So a failure is
+kept until `core.postNvdaStartup`, which NVDA queues into its own loop once the
+initial focus has been reported.
+
+That action fires once per run of NVDA, so a plugin built after it — a reload,
+or the add-on being enabled from the Add-on Store — restores in silence. That
+is the right way round: the tester is looking at a dialog they opened, not at
+the application under test, and the very next command tells them where they
+stand anyway. Asking NVDA whether it has finished starting is what would settle
+this properly, and there is no public way to: the flag is private, and `wx`
+cannot be imported by this add-on at all under the type check CI runs.
+
+Opening a checklist any other way — the file dialog of section 3.2.2, the GUI
+of section 5 — is still to come; until it arrives, the file named in
+`state.json` is the only one the add-on can have.
 """
+
+from pathlib import Path
 
 import addonHandler
 import globalPluginHandler
 import inputCore
+import NVDAState
 import scriptHandler
 import ui
+
+# NVDA's own `core`, which shares a name with the add-on's `core` package
+# below. The two never collide — one is imported absolutely and the other
+# relatively — but `core` in the body of this module would mean whichever the
+# reader guessed, so the one name needed is taken out of it instead.
+from core import postNvdaStartup
 from gui import blockAction
 from logHandler import log
 from scriptHandler import script
 
 from . import signals, wording
-from .core import navigation
+from .core import checklist, navigation, session
 from .core.checklist import Checklist
 from .core.navigation import Direction, Position, Step
+from .core.session import Session
 
 addonHandler.initTranslation()
+
+#: The add-on's own folder inside NVDA's configuration directory, where section
+#: 2 puts `state.json`. Named after the add-on, which section 6 makes eternal —
+#: it is the key of the add-on in the Add-on Store — and which the code package
+#: around this file is already obliged to be named after.
+_CONFIG_FOLDER = "axygenChecklist"
+
+
+def _state_file() -> Path:
+	"""Where the position is kept between runs of NVDA (section 2).
+
+	`WritePaths.configDir` rather than a path worked out here: it follows the
+	NVDA that is actually running, so a portable copy keeps its own state
+	beside its own configuration.
+	"""
+	return Path(NVDAState.WritePaths.configDir) / _CONFIG_FOLDER / "state.json"
 
 
 class GlobalPlugin(globalPluginHandler.GlobalPlugin):
@@ -77,7 +125,77 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 		#: Scratch for the length of one series, and read only on a press that
 		#: has a press of its own before it.
 		self._anchor = Position(0, 0)
+		#: Where the position between runs of NVDA is kept (section 2).
+		self._state = _state_file()
+		#: What the restore has to say, until there is anyone to hear it. None
+		#: when it went well, which section 2 answers with silence.
+		self._startup_message = self._restore()
+		postNvdaStartup.register(self._announce_restore)
 		log.info("Axygen Checklist loaded")
+
+	def terminate(self) -> None:
+		"""NVDA is done with this plugin: let go of the start-up handler.
+
+		The extension point holds bound methods weakly and would drop this one
+		on its own, but only whenever the plugin is collected. Saying so here
+		makes it the moment NVDA names for it.
+		"""
+		postNvdaStartup.unregister(self._announce_restore)
+		super().terminate()
+
+	def _restore(self) -> str | None:
+		"""Pick the run up where the last one left it, and say what stopped it.
+
+		Section 2: the path and the pair of indices come out of `state.json`,
+		and a restart of NVDA lands the tester back on the item they stopped
+		on. Nothing is said when that works — no command was given, and NVDA is
+		mid-sentence about itself at this moment anyway. What comes back is the
+		message a failure has earned, for `_announce_restore` to say later.
+
+		**Nothing is written back here**, whether this went well or badly. A
+		restore reads the position rather than changing it, and section 2 has
+		the file written on a change; a failure has all the more reason to
+		leave it alone, since the path in it is where the file dialog starts
+		browsing (section 3.2.2) and that is wanted precisely when the file it
+		names has gone. Even a position the file has outgrown is left standing:
+		the next move writes the real one, and until then a checklist broken
+		only for the moment can still give the tester their place back.
+		"""
+		remembered = session.load(self._state)
+		if remembered.checklist is None:
+			return None
+		try:
+			loaded = checklist.load(remembered.checklist)
+		except FileNotFoundError:
+			# Translators: Spoken when NVDA starts and the checklist that was open
+			# last time is no longer where it was.
+			return _("Checklist file not found")
+		except OSError:
+			# Everything else that stops a file being read at all: no permission,
+			# a drive that is not there, a name Windows will not open. Section 2
+			# gives them the same four words as a broken file, and the log is
+			# where the difference between them survives.
+			log.error(f"could not read the checklist at {remembered.checklist}", exc_info=True)
+			return wording.spoken_refusal()
+		except checklist.ChecklistError as refusal:
+			return wording.spoken_refusal(refusal.problem)
+		self._checklist = loaded
+		self._position = navigation.resume(loaded, remembered.position)
+		return None
+
+	def _announce_restore(self) -> None:
+		"""Say what the restore could not do, now that NVDA can be heard.
+
+		Section 4 allows the short spoken message and forbids a window here:
+		the tester is working in the application under test, and a dialog that
+		appeared by itself would take the focus with it. Section 2 sends them
+		on to the file dialog when the file has gone, which is the one part of
+		this still to be built.
+		"""
+		if self._startup_message is None:
+			return
+		ui.message(self._startup_message)
+		self._startup_message = None
 
 	@script(
 		description=_(
@@ -116,12 +234,12 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 		# a keypress, so a second press that did nothing would cut the first one
 		# off mid-word and leave the tester with a syllable and no explanation —
 		# indistinguishable, at the keyboard, from an add-on that has crashed.
-		checklist = self._checklist
+		loaded = self._checklist
 		position = self._position
-		if checklist is None or position is None:
-			self._say_nothing_is_loaded()
+		if loaded is None or position is None:
+			self._say_there_is_no_item()
 			return
-		self._speak(checklist, position)
+		self._speak(loaded, position)
 
 	def _navigate(self, direction: Direction) -> None:
 		"""Move one item, or — on the second press of the series — one section.
@@ -135,21 +253,50 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 		the add-on go no deeper than two levels and defines no behaviour for a
 		third, and repeating the answer invents none.
 		"""
-		checklist = self._checklist
+		loaded = self._checklist
 		position = self._position
-		if checklist is None or position is None:
-			self._say_nothing_is_loaded()
+		if loaded is None or position is None:
+			self._say_there_is_no_item()
 			return
 		jump = scriptHandler.getLastScriptRepeatCount() > 0
 		if not jump:
 			self._anchor = position
 		start, step = (self._anchor, Step.SECTION) if jump else (position, Step.ITEM)
-		found = navigation.scan(checklist, start, direction, step, navigation.unfiltered)
+		found = navigation.scan(loaded, start, direction, step, navigation.unfiltered)
 		if found is None:
 			self._refuse(direction, jump=jump)
 			return
 		self._position = found
-		self._speak(checklist, found, name_the_section=jump)
+		self._remember()
+		self._speak(loaded, found, name_the_section=jump)
+
+	def _remember(self) -> None:
+		"""Put the position on disk, now (section 2).
+
+		Every change of the position comes through here, and there is no other
+		moment at which the file is brought up to date — the same rule the
+		checklist is written by, and for the same reason: ten items read
+		through without a single mark would otherwise be ten items lost to a
+		crash, and reading ahead is ordinary work rather than an exception.
+		Whatever opens a checklist of its own (section 3.2.2) changes the path
+		as well as the position, and belongs here too.
+
+		Nothing is written before a checklist has been opened, which is also
+		what makes the position below safe to read: no file, nothing to
+		remember. A tester who has never used the add-on gets no folder in
+		their configuration directory for it.
+
+		A write that does not get there is a line in the log and nothing else
+		(section 2). This runs on every press of a navigation key, so a spoken
+		refusal would arrive on every press too, over the top of the item it
+		was pressed for; and what is lost is the place, not the run.
+		"""
+		if self._checklist is None:
+			return
+		try:
+			session.save(self._state, Session(self._checklist.path, self._position))
+		except OSError:
+			log.error(f"could not write the session state to {self._state}", exc_info=True)
 
 	def _refuse(self, direction: Direction, jump: bool) -> None:
 		"""Say that there is nothing that way.
@@ -173,17 +320,28 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 			# Translators: Spoken when there is no section before this one to jump to.
 			ui.message(_("Start of list"))
 
-	def _speak(self, checklist: Checklist, position: Position, name_the_section: bool = False) -> None:
+	def _speak(self, loaded: Checklist, position: Position, name_the_section: bool = False) -> None:
 		"""Say the item at `position`, the way sections 3.1 and 3.3 both say it."""
-		section = navigation.section_at(checklist, position).name if name_the_section else None
-		ui.message(wording.spoken_item(navigation.item_at(checklist, position), section))
+		section = navigation.section_at(loaded, position).name if name_the_section else None
+		ui.message(wording.spoken_item(navigation.item_at(loaded, position), section))
 
-	def _say_nothing_is_loaded(self) -> None:
-		"""Section 4: the same four words from every command, worded in one place.
+	def _say_there_is_no_item(self) -> None:
+		"""Section 4: why a command found nothing to work on, worded in one place.
 
-		What a checklist that holds no items at all should be answered with is
-		a question for whatever first manages to load one — the file dialog
-		(section 3.2.2) — since nothing here can put one in front of a tester.
+		Two states reach here and they are not the same one. Nothing has been
+		opened at all — and nothing could be, until `state.json` or the file
+		dialog (section 3.2.2) puts a file here. Or a checklist is open and has
+		no items in it: section 2 asks a file for at least one section and
+		never for a minimum of items, so that file is valid and genuinely
+		loaded, and answering it with "not loaded" would be a lie about the one
+		thing the tester can check at that moment — whether they opened the
+		file they meant to. What to do about them differs too: pick a file, or
+		write some items into the one already picked.
 		"""
-		# Translators: Spoken when a command is used before a checklist has been opened.
-		ui.message(_("No checklist loaded"))
+		if self._checklist is None:
+			# Translators: Spoken when a command is used before a checklist has been opened.
+			ui.message(_("No checklist loaded"))
+			return
+		# Translators: Spoken when a command is used on a checklist whose sections
+		# are all empty, so there is no item to stand on.
+		ui.message(_("The checklist has no items"))

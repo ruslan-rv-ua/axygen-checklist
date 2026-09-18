@@ -96,6 +96,41 @@ def item_at(checklist: Checklist, position: Position) -> Item:
 	return section_at(checklist, position).items[position.item]
 
 
+def resume(checklist: Checklist, position: Position | None) -> Position | None:
+	"""Where the tester stands when `checklist` is opened, or None if nowhere.
+
+	`position` is what was remembered of this file, and None when nothing was —
+	a file opened for the first time. Section 2 keeps it in `state.json`, which
+	section 7.1 calls an internal cache: it holds indices, and the file they
+	index into is edited by its author between sessions. So the pair may no
+	longer name a place at all, and then the run starts at the first item of
+	the file.
+
+	Trimming an index to the nearest one that still exists is rejected by
+	section 2: the structure those indices described is gone, and stopping
+	"nearby" would fake a precision they have lost. What holds an item together
+	across edits is `id`, and no behaviour of the add-on reads it.
+
+	No visibility predicate is taken, and that is deliberate. Opening a file is
+	not navigation: section 3.4 states that the item the tester stands on need
+	not satisfy the predicate, whereas landing nowhere because the filter
+	happened to be on would be a state nothing in the specification answers.
+
+	None comes back only from a checklist there is genuinely nowhere to stand
+	in — one whose sections are all empty, which section 2 allows.
+	"""
+	if position is not None and _holds(checklist, position):
+		return position
+	return next(iter(_positions(checklist)), None)
+
+
+def _holds(checklist: Checklist, position: Position) -> bool:
+	"""Whether `position` names a real place in `checklist`."""
+	if not 0 <= position.section < len(checklist.sections):
+		return False
+	return 0 <= position.item < len(section_at(checklist, position).items)
+
+
 def scan(
 	checklist: Checklist,
 	start: Position,
@@ -130,14 +165,24 @@ def _items(checklist: Checklist, start: Position, direction: Direction) -> list[
 	section reaches the first item of the next one: section 3.1 moves to the
 	next item *of the list*, and the list runs through the sections.
 	"""
-	positions = [
+	positions = _positions(checklist)
+	if direction is Direction.FORWARD:
+		return [position for position in positions if position > start]
+	return [position for position in reversed(positions) if position < start]
+
+
+def _positions(checklist: Checklist) -> list[Position]:
+	"""Every position of `checklist`, in the order the file lists them.
+
+	The whole of the checklist as one flat run of places to stand — sections
+	holding no items simply contribute none. Both the step of section 3.1 and
+	the start of a run read it; where they differ is only which end they take.
+	"""
+	return [
 		Position(section, item)
 		for section, entry in enumerate(checklist.sections)
 		for item in range(len(entry.items))
 	]
-	if direction is Direction.FORWARD:
-		return [position for position in positions if position > start]
-	return [position for position in reversed(positions) if position < start]
 
 
 def _sections(checklist: Checklist, start: Position, direction: Direction) -> list[Position]:

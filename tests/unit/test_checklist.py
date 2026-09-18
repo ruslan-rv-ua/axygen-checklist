@@ -15,7 +15,6 @@ the fixtures that state what a valid file is state it for both.
 """
 
 import json
-import shutil
 import tempfile
 import unittest
 from pathlib import Path
@@ -24,7 +23,7 @@ from unittest import mock
 
 from core import checklist, status
 
-from .support import fixture_names, fixture_text
+from .support import fixture_names, fixture_text, temporary_directory
 
 
 class TestReading(unittest.TestCase):
@@ -292,9 +291,7 @@ class OnDisk(unittest.TestCase):
 
 	def write(self, text: str, encoding: str = "utf-8") -> Path:
 		"""Put `text` in a checklist file of its own, and hand back the path."""
-		directory = tempfile.mkdtemp()
-		self.addCleanup(shutil.rmtree, directory, True)
-		path = Path(directory) / "checklist.json"
+		path = temporary_directory(self) / "checklist.json"
 		path.write_text(text, encoding=encoding)
 		return path
 

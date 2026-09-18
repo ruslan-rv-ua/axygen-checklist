@@ -36,16 +36,14 @@ already makes: this module names the breach as a `Problem`, and the shell turns
 it into a sentence, still from one table. Nothing here is ever shown to anyone.
 """
 
-import contextlib
 import dataclasses
 import enum
 import json
-import os
 from collections.abc import Callable, Sequence
 from pathlib import Path
 from typing import Any, TypeGuard, cast
 
-from . import fragments, status
+from . import disk, fragments, status
 
 #: The newest format version this add-on understands. A file that declares more
 #: than this is refused with a message of its own: section 7.1 rests the whole
@@ -322,28 +320,11 @@ class Checklist:
 		"""
 		if self._path is None:
 			raise ValueError("this checklist was read from text and has no file to write back to")
-		text = dumps(self)
-		# Section 2: the change reaches the disk whole or not at all. Writing
+		# Whole or not at all, which is `disk.write`'s whole business: writing
 		# straight into the checklist would empty it before filling it again,
-		# and this runs hundreds of times a session inside a screen reader that
-		# an add-on can bring down — a crash inside that window would leave a
-		# stump where the texts and the notes had been, not just the run.
-		#
-		# The temporary file is a sibling of the checklist rather than a file
-		# in the temporary directory, because the swap is a single operation
-		# only within one volume.
-		temporary = self._path.with_name(self._path.name + ".tmp")
-		try:
-			# `newline` rather than the platform default: the add-on only ever
-			# runs on Windows, but a checklist is a data file that usually
-			# lives in version control beside the product under test, so what
-			# it writes is the same on every machine that reads the repository.
-			temporary.write_text(text, encoding="utf-8", newline="\n")
-			os.replace(temporary, self._path)
-		except OSError:
-			with contextlib.suppress(OSError):
-				temporary.unlink()
-			raise
+		# and a crash inside that window would leave a stump where the texts
+		# and the notes had been, not just the run (section 2).
+		disk.write(self._path, dumps(self))
 
 
 def dumps(checklist: Checklist) -> str:
