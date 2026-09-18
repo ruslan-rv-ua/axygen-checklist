@@ -36,9 +36,11 @@ already makes: this module names the breach as a `Problem`, and the shell turns
 it into a sentence, still from one table. Nothing here is ever shown to anyone.
 """
 
+import contextlib
 import dataclasses
 import enum
 import json
+import os
 from collections.abc import Callable, Sequence
 from pathlib import Path
 from typing import Any, TypeGuard, cast
@@ -50,6 +52,9 @@ from . import status
 #: meaning of the major version number on an old add-on refusing a newer file,
 #: because it is the old one that will meet it.
 KNOWN_FORMAT_VERSION = 1
+
+#: One level of nesting in a written file (section 2).
+_INDENT = "  "
 
 #: Every format version this add-on can read. Section 2 states the rule as "a
 #: version the add-on knows" rather than "no higher than the newest one",
@@ -305,11 +310,28 @@ class Checklist:
 		"""
 		if self._path is None:
 			raise ValueError("this checklist was read from text and has no file to write back to")
-		# `newline` rather than the platform default: the add-on only ever runs
-		# on Windows, but a checklist is a data file that usually lives in
-		# version control beside the product under test, so what it writes is
-		# the same on every machine that reads the repository.
-		self._path.write_text(dumps(self), encoding="utf-8", newline="\n")
+		text = dumps(self)
+		# Section 2: the change reaches the disk whole or not at all. Writing
+		# straight into the checklist would empty it before filling it again,
+		# and this runs hundreds of times a session inside a screen reader that
+		# an add-on can bring down — a crash inside that window would leave a
+		# stump where the texts and the notes had been, not just the run.
+		#
+		# The temporary file is a sibling of the checklist rather than a file
+		# in the temporary directory, because the swap is a single operation
+		# only within one volume.
+		temporary = self._path.with_name(self._path.name + ".tmp")
+		try:
+			# `newline` rather than the platform default: the add-on only ever
+			# runs on Windows, but a checklist is a data file that usually
+			# lives in version control beside the product under test, so what
+			# it writes is the same on every machine that reads the repository.
+			temporary.write_text(text, encoding="utf-8", newline="\n")
+			os.replace(temporary, self._path)
+		except OSError:
+			with contextlib.suppress(OSError):
+				temporary.unlink()
+			raise
 
 
 def dumps(checklist: Checklist) -> str:
@@ -324,8 +346,58 @@ def dumps(checklist: Checklist) -> str:
 	What changes is how the checklist is written down, never what it says: no
 	status, comment, note or text means anything different afterwards. So this
 	is not a change escaping without a write — there is nothing here to write.
+
+	The shape is the one section 2 calls canonical, and the one the examples in
+	the documentation are drawn in: the document, `sections` and `items` opened
+	out, and an item on a line of its own. `json.dumps` cannot mix the two, so
+	the three levels are laid out here and every value inside them is still
+	handed to `json.dumps` — which is what keeps the escaping honest.
 	"""
-	return json.dumps(_canonical(checklist.document), ensure_ascii=False, indent=2) + "\n"
+	document = _canonical(checklist.document)
+	sections = [
+		_as_object(section, {"items": _as_array(_as_items(section), _INDENT * 4)}, _INDENT * 3)
+		for section in document["sections"]
+	]
+	return _as_object(document, {"sections": _as_array(sections, _INDENT * 2)}, _INDENT) + "\n"
+
+
+def _as_items(section: dict[str, Any]) -> list[str]:
+	"""The items of `section`, each written out as a single line.
+
+	An item is the row of a checklist, and section 2 keeps it one: `text` and
+	`note` are edited by hand, and an item opened out over seven lines would
+	turn a checklist of sixty into a file of four hundred.
+	"""
+	return [json.dumps(item, ensure_ascii=False) for item in section["items"]]
+
+
+def _as_array(entries: list[str], indent: str) -> str:
+	"""`entries`, already written out, as an array holding one per line."""
+	if not entries:
+		return "[]"
+	body = ",\n".join(indent + entry for entry in entries)
+	return "[\n" + body + "\n" + indent[: -len(_INDENT)] + "]"
+
+
+def _as_object(data: dict[str, Any], opened: dict[str, str], indent: str) -> str:
+	"""`data` as an object holding one field per line, in the order it has them.
+
+	`opened` carries the fields already written out over several lines — the
+	two that hold the structure of a checklist. Everything else is written
+	compactly, however deep it goes: an unknown field is of a shape the add-on
+	knows nothing about, and it has no grounds for opening that shape out.
+
+	The order of the fields is the file's own. Section 2 makes the *look* of a
+	written file canonical, not the order of what is in it.
+	"""
+	if not data:
+		return "{}"
+	pairs = [
+		f"{json.dumps(key, ensure_ascii=False)}: "
+		f"{opened[key] if key in opened else json.dumps(value, ensure_ascii=False)}"
+		for key, value in data.items()
+	]
+	return "{\n" + ",\n".join(indent + pair for pair in pairs) + "\n" + indent[: -len(_INDENT)] + "}"
 
 
 def loads(text: str) -> Checklist:

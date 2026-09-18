@@ -72,6 +72,12 @@ has checked it, and it reads as `"pending"`.
 Unknown fields are allowed. The add-on ignores them when reading and keeps them
 when it rewrites the file, so extra data you attach to an item survives the run.
 
+The add-on rewrites the file in the shape you see above: two-space indent, one
+item per line, UTF-8 without a byte order mark, LF line endings. It writes
+`status` out on every item and `format_version` at least once, so a file that
+left out either comes back carrying it. Nothing else about your file changes —
+field order included.
+
 `checklist_name`, `section_name`, `text`, `note` and `comment` are content, not
 interface. Write them in whatever language the checklist is for; nothing ever
 translates them.

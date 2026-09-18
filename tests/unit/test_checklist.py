@@ -425,6 +425,50 @@ class TestWriteRules(unittest.TestCase):
 		loaded = checklist.loads(fixture_text("valid", "minimal"))
 		self.assertEqual(checklist.dumps(loaded), checklist.dumps(loaded))
 
+	def test_an_item_is_written_on_a_line_of_its_own(self):
+		# Section 2, and the shape every example in the documentation is drawn
+		# in: `text` and `note` are edited by hand, and an item opened out over
+		# seven lines would turn a checklist of sixty into a file of four
+		# hundred.
+		lines = checklist.dumps(checklist.loads(fixture_text("valid", "complete"))).splitlines()
+		items = [line.strip().rstrip(",") for line in lines if line.strip().startswith('{"id"')]
+		self.assertEqual(len(items), 4)
+		for item in items:
+			with self.subTest(item=item):
+				self.assertIsInstance(json.loads(item), dict)
+
+	def test_the_document_and_its_sections_are_opened_out(self):
+		# The three levels that are the structure of a checklist; everything
+		# inside an item is on the item's own line.
+		text = checklist.dumps(checklist.loads(fixture_text("valid", "complete")))
+		self.assertIn('\n  "sections": [\n', text)
+		self.assertIn('\n      "items": [\n', text)
+
+	def test_a_section_holding_no_items_keeps_an_empty_array(self):
+		written = checklist.dumps(checklist.loads(fixture_text("valid", "empty-items")))
+		self.assertIn('"items": []', written)
+
+	def test_an_unknown_field_is_written_compactly_however_deep_it_goes(self):
+		# Section 2: the add-on knows nothing of the shape of such a field, and
+		# has no grounds for opening that shape out.
+		loaded = checklist.loads(
+			json.dumps(
+				{
+					"checklist_name": "x",
+					"meta": {"agent": "an agent", "runs": [1, 2]},
+					"sections": [{"section_name": "s", "items": []}],
+				},
+			),
+		)
+		self.assertIn('"meta": {"agent": "an agent", "runs": [1, 2]}', checklist.dumps(loaded))
+
+	def test_writing_a_file_the_add_on_wrote_changes_nothing_in_it(self):
+		# Stronger than the fixed point above, because it goes back through the
+		# parser: after the first save of a session, the hundreds that follow
+		# leave every part nobody touched exactly as it was.
+		once = checklist.dumps(checklist.loads(fixture_text("valid", "complete")))
+		self.assertEqual(checklist.dumps(checklist.loads(once)), once)
+
 	def test_the_file_stays_one_a_person_can_edit(self):
 		# Checklists are written by hand, and the add-on hands the file back to
 		# whoever wrote it: indented, with the words in it rather than escapes,
@@ -510,6 +554,27 @@ class TestRecordingAChange(OnDisk):
 		loaded.sections[0].items[0].record_comment("Кирилиця")
 		assert loaded.path is not None
 		self.assertIn("Кирилиця".encode(), loaded.path.read_bytes())
+
+	def test_nothing_is_left_lying_beside_the_checklist(self):
+		# The file the write goes through first is swept up behind it, whether
+		# the write got there or not.
+		loaded = self.loaded()
+		loaded.sections[0].items[0].record_status(status.PASSED)
+		assert loaded.path is not None
+		self.assertEqual([path.name for path in loaded.path.parent.iterdir()], ["checklist.json"])
+
+	def test_a_write_that_fails_leaves_the_file_as_it_was(self):
+		# Section 2: the change reaches the disk whole or not at all. Writing
+		# straight into the checklist would empty it before filling it again,
+		# and this add-on runs inside a screen reader it is able to bring down.
+		loaded = self.loaded("complete")
+		before = self.on_disk(loaded)
+		with mock.patch("os.replace", side_effect=OSError("no swap for you")):
+			with self.assertRaises(OSError):
+				loaded.sections[0].items[0].record_status(status.FAILED)
+		self.assertEqual(self.on_disk(loaded), before)
+		assert loaded.path is not None
+		self.assertEqual([path.name for path in loaded.path.parent.iterdir()], ["checklist.json"])
 
 	def test_a_checklist_that_came_from_text_has_no_file_to_write_to(self):
 		# `loads` is the parsing seam, not a way to hold a checklist: what the
