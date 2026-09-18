@@ -22,6 +22,12 @@ press of a series without waiting for the series to end, and the interval it
 counts is the user's own `multiPressTimeout`. Measuring the time between calls
 ourselves is forbidden, and would hard-code a setting that belongs to the
 screen reader.
+
+**The position does not reach the disk yet.** Section 2 has it written to
+`state.json` on every change, navigation included, so that a restart of the
+screen reader puts the tester back where they stopped. Nothing here can load a
+checklist either, so the two arrive together with `state.json` and the file
+dialog; until then the commands have nothing to work on and say so.
 """
 
 import addonHandler
@@ -54,13 +60,23 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 		#: Loading it is the business of the file dialog and of `state.json`;
 		#: until one of them puts it here, every command says so (section 4).
 		self._checklist: Checklist | None = None
-		#: Where the tester is. Meaningful only alongside a checklist, and set
-		#: together with it.
-		self._position = Position(0, 0)
+		#: Where the tester is, and None when there is nowhere to stand.
+		#:
+		#: Optional rather than a position that starts at the top, because a
+		#: checklist with no items in it at all is a *valid* file: section 2
+		#: requires at least one section and never a minimum of items. Whatever
+		#: loads a checklist has to work out where a run starts and may find
+		#: that there is no answer; asserting `Position(0, 0)` instead would
+		#: read past the end of an empty section, and an exception inside a
+		#: global plugin is exactly the mid-session silence section 2 exists to
+		#: prevent.
+		self._position: Position | None = None
 		#: Where the current series of presses started. Section 3.1: the single
 		#: press has already moved by the time the second press arrives, so a
 		#: jump measured from the item it landed on would skip a whole section.
-		self._anchor = self._position
+		#: Scratch for the length of one series, and read only on a press that
+		#: has a press of its own before it.
+		self._anchor = Position(0, 0)
 		log.info("Axygen Checklist loaded")
 
 	@script(
@@ -86,22 +102,26 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 		self._navigate(Direction.BACKWARD)
 
 	@script(
-		# Translators: The description of a command, as it appears in NVDA's Input Gestures dialog.
-		description=_("Reads the current item of the checklist again"),
+		description=_(
+			# Translators: The description of a command, as it appears in NVDA's Input Gestures dialog.
+			"Reads the current item of the checklist again",
+		),
 		gesture="kb:NVDA+alt+i",
 	)
 	@blockAction.when(blockAction.Context.MODAL_DIALOG_OPEN)
 	def script_readItem(self, gesture: inputCore.InputGesture) -> None:
-		if scriptHandler.getLastScriptRepeatCount() > 0:
-			# The second press of this key opens the item dialog (section 3.3),
-			# which is not built yet. Reading the item again instead would be
-			# behaviour the specification does not have, and it would have to
-			# be taken back when the dialog arrives.
+		# Every press reads the item, the second one included. Section 3.3 gives
+		# the second press the item dialog, which is not built yet, and the one
+		# thing this may not do meanwhile is fall silent: NVDA cancels speech on
+		# a keypress, so a second press that did nothing would cut the first one
+		# off mid-word and leave the tester with a syllable and no explanation —
+		# indistinguishable, at the keyboard, from an add-on that has crashed.
+		checklist = self._checklist
+		position = self._position
+		if checklist is None or position is None:
+			self._say_nothing_is_loaded()
 			return
-		checklist = self._loaded()
-		if checklist is None:
-			return
-		self._speak(checklist, self._position)
+		self._speak(checklist, position)
 
 	def _navigate(self, direction: Direction) -> None:
 		"""Move one item, or — on the second press of the series — one section.
@@ -115,32 +135,34 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 		the add-on go no deeper than two levels and defines no behaviour for a
 		third, and repeating the answer invents none.
 		"""
-		checklist = self._loaded()
-		if checklist is None:
+		checklist = self._checklist
+		position = self._position
+		if checklist is None or position is None:
+			self._say_nothing_is_loaded()
 			return
 		jump = scriptHandler.getLastScriptRepeatCount() > 0
 		if not jump:
-			self._anchor = self._position
-		found = navigation.scan(
-			checklist,
-			self._anchor if jump else self._position,
-			direction,
-			Step.SECTION if jump else Step.ITEM,
-			navigation.visible,
-		)
+			self._anchor = position
+		start, step = (self._anchor, Step.SECTION) if jump else (position, Step.ITEM)
+		found = navigation.scan(checklist, start, direction, step, navigation.unfiltered)
 		if found is None:
-			self._refuse(direction, jump)
+			self._refuse(direction, jump=jump)
 			return
 		self._position = found
 		self._speak(checklist, found, name_the_section=jump)
 
 	def _refuse(self, direction: Direction, jump: bool) -> None:
-		"""Say that there is nothing that way, leaving the position where it is.
+		"""Say that there is nothing that way.
 
 		Section 3.1 answers a single press with a tone and a jump with words.
 		A tone is what the most frequent of the two can afford; a jump is
 		deliberate, and silence would not say whether it failed or simply
 		landed somewhere whose name went unheard.
+
+		The position is left exactly as it stands, which after a failed jump is
+		wherever the first press of the series already took it (section 3.1).
+		Putting it back would mean undoing a press that had run — the one
+		mechanism section 3.2.1 was glad to be rid of.
 		"""
 		if not jump:
 			signals.list_boundary()
@@ -156,13 +178,12 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 		section = navigation.section_at(checklist, position).name if name_the_section else None
 		ui.message(wording.spoken_item(navigation.item_at(checklist, position), section))
 
-	def _loaded(self) -> Checklist | None:
-		"""The checklist to work on, having said so when there is none.
+	def _say_nothing_is_loaded(self) -> None:
+		"""Section 4: the same four words from every command, worded in one place.
 
-		Section 4 gives every command the same four words for this, so they are
-		said in one place rather than at the head of each script.
+		What a checklist that holds no items at all should be answered with is
+		a question for whatever first manages to load one — the file dialog
+		(section 3.2.2) — since nothing here can put one in front of a tester.
 		"""
-		if self._checklist is None:
-			# Translators: Spoken when a command is used before a checklist has been opened.
-			ui.message(_("No checklist loaded"))
-		return self._checklist
+		# Translators: Spoken when a command is used before a checklist has been opened.
+		ui.message(_("No checklist loaded"))

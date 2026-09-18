@@ -67,20 +67,21 @@ class Step(enum.Enum):
 	SECTION = enum.auto()
 
 
-#: What a scan is allowed to land on.
-Visible = Callable[[Item], bool]
+#: The visibility predicate of section 3.4: whether a scan may land on an item.
+#: A predicate rather than a flag read from somewhere, because the core is never
+#: told where to find anything — what arrives is the item to judge, not a way to
+#: work out the rules.
+VisibilityPredicate = Callable[[Item], bool]
 
 
-def visible(item: Item) -> bool:
-	"""Whether `item` is one the tester is currently being shown.
+def unfiltered(item: Item) -> bool:
+	"""The predicate while the filter is off: every item is one to land on.
 
 	Identically true, and that is the whole of the filter in 0.1.0 (section
-	3.4). In 0.2.0 the `F` key of the command mode supplies the other predicate,
-	`item.status == "pending"`, and nothing else about navigation changes.
-
-	It takes the item it judges rather than reading a filter flag from
-	somewhere, because the core is never told where to find anything: what
-	arrives here is the thing to judge, not a way to work out the rules.
+	3.4). In 0.2.0 the `F` key of the command mode supplies a second predicate
+	beside this one, `item.status == "pending"`, and nothing else about
+	navigation changes. It is named for the state it stands for rather than for
+	the concept, so that the second one has a name left to take.
 	"""
 	return True
 
@@ -100,7 +101,7 @@ def scan(
 	start: Position,
 	direction: Direction,
 	step: Step,
-	visible: Visible,
+	visible: VisibilityPredicate,
 ) -> Position | None:
 	"""Where a move from `start` lands, or None when it runs off the end.
 

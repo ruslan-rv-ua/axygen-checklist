@@ -47,13 +47,17 @@ def loaded(*sections: Sequence[str]) -> checklist.Checklist:
 		"sections": [
 			{
 				"section_name": f"Section {index + 1}",
-				"items": [{"id": (number := next(numbers)), "text": f"Item {number}", "status": value}
-					for value in statuses],
+				"items": [_item(next(numbers), value) for value in statuses],
 			}
 			for index, statuses in enumerate(sections)
 		],
 	}
 	return checklist.loads(json.dumps(document))
+
+
+def _item(number: int, value: str) -> dict[str, object]:
+	"""One item, numbered straight through the file and saying so in its text."""
+	return {"id": number, "text": f"Item {number}", "status": value}
 
 
 def pending_only(item: checklist.Item) -> bool:
@@ -91,7 +95,7 @@ class Scanning(unittest.TestCase):
 		direction: Direction,
 		step: Step,
 	) -> Position | None:
-		return navigation.scan(document, start, direction, step, navigation.visible)
+		return navigation.scan(document, start, direction, step, navigation.unfiltered)
 
 
 class TestSteppingByItem(Scanning):
@@ -173,7 +177,7 @@ class TestVisibility(unittest.TestCase):
 		# Section 3.4 ships the model before the command: in 0.1.0 the
 		# predicate is identically true, so nothing is ever skipped.
 		document = loaded(list(status.STATUSES))
-		self.assertTrue(all(navigation.visible(item) for item in document.sections[0].items))
+		self.assertTrue(all(navigation.unfiltered(item) for item in document.sections[0].items))
 
 	def test_a_step_passes_over_what_the_predicate_refuses(self):
 		document = loaded(["pending", "passed", "pending"])
