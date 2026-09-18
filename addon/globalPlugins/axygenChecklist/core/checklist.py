@@ -45,7 +45,7 @@ from collections.abc import Callable, Sequence
 from pathlib import Path
 from typing import Any, TypeGuard, cast
 
-from . import status
+from . import fragments, status
 
 #: The newest format version this add-on understands. A file that declares more
 #: than this is refused with a message of its own: section 7.1 rests the whole
@@ -180,6 +180,18 @@ class Item:
 		the string it got is really there.
 		"""
 		return _text(self._data.get("comment"))
+
+	@property
+	def fragments(self) -> Sequence[str]:
+		"""The exact strings this item asks the tester to reproduce verbatim.
+
+		Section 2 collects them from `text` and then `note`, and from `comment`
+		never: that field belongs to the tester, and text is copied out of it
+		from the item dialog instead. Which fields they come from is a fact
+		about an item, so it is settled here; what a fragment *is* belongs to
+		`fragments` and is settled there.
+		"""
+		return fragments.of(self.text, self.note)
 
 	def record_status(self, value: str) -> None:
 		"""Give the item this status and rewrite the file at once (section 2).
