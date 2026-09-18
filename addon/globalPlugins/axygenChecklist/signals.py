@@ -15,8 +15,8 @@ nothing else calls `tones.beep` directly. Picking a tone that differs from
 three others is only possible with the three in front of you, and this is where
 they will be.
 
-Three of the four arrive with the commands that raise them (sections 3.2.2 and
-4); this one is the first.
+Two of the four arrive with the command mode that raises them (section 3.2.2);
+the two here are the edge of the list and the end of the run.
 
 **A tone and not speech, on purpose.** NVDA cancels speech when a gesture is
 executed (`speechEffectWhenExecuted` in `inputCore.executeGesture`), so a
@@ -39,3 +39,17 @@ def list_boundary() -> None:
 	or merely landed somewhere the tester did not catch the name of.
 	"""
 	tones.beep(220, 80)
+
+
+def checklist_finished() -> None:
+	"""Nothing is still pending: the run is over (section 4).
+
+	High and long, which is what tells it apart from the edge of the list —
+	the only other signal built so far, and the low short one. The two that
+	arrive with the command mode are short as well (section 3.2.2), so this
+	stays the only long tone of the four and the only one above the middle.
+
+	Once a run, against the boundary's many times a run, and it carries news
+	worth stopping for rather than a refusal to step further.
+	"""
+	tones.beep(880, 200)

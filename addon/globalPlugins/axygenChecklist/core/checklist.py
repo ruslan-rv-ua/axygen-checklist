@@ -296,6 +296,17 @@ class Checklist:
 		return self._document["checklist_name"]
 
 	@property
+	def items(self) -> Sequence[Item]:
+		"""Every item of every section, in the order the file lists them.
+
+		The whole checklist read as one run of items, which is how the things
+		that are true of a run rather than of a place ask about it: whether
+		anything is still pending (section 4), and later the report (section
+		7.2). Sections holding no items simply contribute none.
+		"""
+		return [item for section in self._sections for item in section.items]
+
+	@property
 	def sections(self) -> Sequence[Section]:
 		"""The sections of the checklist, in the order the file lists them."""
 		return self._sections

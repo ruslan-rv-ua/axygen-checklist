@@ -35,12 +35,24 @@ whole add-on: the short spoken form belongs here, beside the statuses, because
 it is said from wherever a checklist is opened — at start-up from `state.json`
 (section 2), by the file dialog and by the GUI (sections 3.2.2 and 5). The core
 names the breach and never words it; see `core/checklist.py`.
+
+**Why a change was refused.** Its opposite number, and here for the same
+reason: section 4 gives every command that changes data the one phrase, and by
+0.1.0 that is the quick toggle, the digits of the command mode, a reset of a
+section or of the run, and a save from the item dialog. The core raises
+`OSError` and words nothing there either.
+
+**How far the run has got.** Section 4 speaks it at the end of the checklist
+and section 3.3 for one section, out of the single count in `core.progress`;
+the clause about failures is the same clause in both, so it is written once
+below and neither caller spells it out.
 """
 
 import addonHandler
 
 from .core import status
 from .core.checklist import Item, Problem, ProblemKind
+from .core.progress import Progress
 
 addonHandler.initTranslation()
 
@@ -137,3 +149,64 @@ def spoken_refusal(problem: Problem | None = None) -> str:
 	# Translators: Spoken when a checklist file cannot be read, or holds something
 	# that is not a valid checklist.
 	return _("Error reading the file")
+
+
+def spoken_write_failure() -> str:
+	"""What the tester hears when a change did not reach the disk (section 4).
+
+	One phrase for every cause. A read-only file, an antivirus or an open
+	editor holding it, a folder that left with its removable drive, a full
+	disk — they all arrive the same way and they all send the tester to the
+	same place: free the file and press again. The two messages on the way in
+	(section 2) are two because they lead different ways, to a broken file or
+	to an update of the add-on; there is no such split here, and what tells the
+	causes apart stays in the log.
+
+	Hearing it means the command was refused, not that the verdict came with a
+	footnote: nothing else is spoken after it — no status word, no next item,
+	no signal that the checklist is finished. The change does stay in memory,
+	and any later write carries the whole file, so the first one that succeeds
+	takes everything that has piled up with it.
+	"""
+	# Translators: Spoken when a change to the checklist could not be written to the
+	# file, so it is in memory but not on disk.
+	return _("Error writing the file")
+
+
+def spoken_completion(counted: Progress) -> str:
+	"""What the tester hears when nothing in the checklist is pending (section 4).
+
+	Said whichever way the last verdict was recorded and whatever auto-advance
+	is set to, because it is news about the run rather than about the command
+	that ended it. Not said after a write that failed: the phrase would be
+	claiming something about the run that is not on the disk.
+
+	The count is of every item in the file, and it is a count of items looked
+	at rather than of items that worked — section 3.3 refuses "done" for the
+	same reason. A checklist holding a failure is finished work, and the
+	failures are named after the total rather than taken out of it.
+	"""
+	spoken = ngettext(
+		# Translators: Spoken when the last item of a checklist has been given a
+		# status, so nothing in it is left unchecked. {count} is how many items
+		# the checklist holds. The word "All" is dropped from the singular, where
+		# it reads as a flourish over a count of one.
+		"Checklist complete! {count} item processed",
+		"Checklist complete! All {count} items processed",
+		counted.total,
+	)
+	return spoken.format(count=counted.total) + _failures(counted.failed)
+
+
+def _failures(count: int) -> str:
+	"""The clause naming failures, and nothing at all when there were none.
+
+	Section 4 adds it to the end of the checklist and section 3.3 to the
+	progress of a section — the same words in both, and in both only when there
+	is something to add. No noise when all is well, loud when it is not.
+	"""
+	if not count:
+		return ""
+	# Translators: Added after a count of checklist items when some of them failed,
+	# running straight on from it: "All 12 items processed, 2 failed".
+	return _(", {count} failed").format(count=count)

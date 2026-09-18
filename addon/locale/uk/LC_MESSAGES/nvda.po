@@ -15,6 +15,30 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=3; plural=(n%10==1 && n%100!=11 ? 0 : n%10>=2 && n%10<=4 && (n%100<10 || n%100>=20) ? 1 : 2);\n"
 
+#. Translators: Spoken when a change to the checklist could not be written to the
+#. file, so it is in memory but not on disk.
+msgid "Error writing the file"
+msgstr "Помилка запису файлу"
+
+#. Translators: Spoken when the last item of a checklist has been given a
+#. status, so nothing in it is left unchecked. {count} is how many items
+#. the checklist holds. The word "All" is dropped from the singular, where
+#. it reads as a flourish over a count of one.
+# The first form covers 1, 21, 31 and so on, where "всі" reads as a flourish in
+# Ukrainian too; the other two carry it.
+#, python-brace-format
+msgid "Checklist complete! {count} item processed"
+msgid_plural "Checklist complete! All {count} items processed"
+msgstr[0] "Чекліст завершено! Опрацьовано {count} пункт"
+msgstr[1] "Чекліст завершено! Опрацьовано всі {count} пункти"
+msgstr[2] "Чекліст завершено! Опрацьовано всі {count} пунктів"
+
+#. Translators: Added after a count of checklist items when some of them failed,
+#. running straight on from it: "All 12 items processed, 2 failed".
+#, python-brace-format
+msgid ", {count} failed"
+msgstr ", провалено {count}"
+
 #. Translators: The name of the category this add-on's commands appear under
 #. in NVDA's Input Gestures dialog.
 #. Add-on summary/title, usually the user visible name of the add-on
@@ -24,6 +48,14 @@ msgstr ""
 # add-on carries in the Add-on Store, in the configuration directory and in its documentation.
 msgid "Axygen Checklist"
 msgstr "Axygen Checklist"
+
+#. Translators: The description of a command, as it appears in NVDA's Input Gestures dialog.
+msgid ""
+"Marks the current checklist item as passed, or as not checked if it passed "
+"already"
+msgstr ""
+"Позначає поточний пункт чекліста пройденим, а вже пройдений повертає в «не "
+"перевірено»"
 
 #. Add-on description
 #. Translators: Long description to be shown for this add-on on add-on information from add-on store

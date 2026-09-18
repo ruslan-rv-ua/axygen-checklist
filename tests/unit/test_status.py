@@ -46,3 +46,37 @@ class TestVerdicts(unittest.TestCase):
 
 	def test_pending_is_not_a_verdict(self):
 		self.assertFalse(status.is_verdict(status.PENDING))
+
+
+class TestTheQuickToggle(unittest.TestCase):
+	"""Section 3.2.1: the rule behind `NVDA+Alt+Space`, and it is total."""
+
+	def test_passed_goes_back_to_pending(self):
+		self.assertEqual(status.toggled(status.PASSED), status.PENDING)
+
+	def test_every_other_status_becomes_passed(self):
+		# The rule is defined for all five states on purpose: a toggle that only
+		# knew two of them would be undefined on the other three, which are
+		# reachable through the command mode and the item dialog (section 3.2).
+		self.assertEqual(
+			{value: status.toggled(value) for value in status.STATUSES if value != status.PASSED},
+			{
+				status.PENDING: status.PASSED,
+				status.FAILED: status.PASSED,
+				status.BLOCKED: status.PASSED,
+				status.SKIPPED: status.PASSED,
+			},
+		)
+
+	def test_pressing_twice_puts_the_status_back(self):
+		# Section 3.2.1 has no series here: a second press is simply another
+		# toggle, so the most frequent key of the add-on costs nothing to press
+		# again by accident.
+		self.assertEqual(status.toggled(status.toggled(status.PENDING)), status.PENDING)
+
+	def test_a_third_state_is_not_restored_by_pressing_twice(self):
+		# A two-state toggle has nowhere to put `failed` back to: the first press
+		# makes it `passed`, and the second carries on to `pending` rather than
+		# returning. Section 4 names the honest repeat instead — a digit of the
+		# command mode, which assigns a status outright however often it is used.
+		self.assertEqual(status.toggled(status.toggled(status.FAILED)), status.PENDING)

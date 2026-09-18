@@ -39,6 +39,28 @@ class TestReading(unittest.TestCase):
 		loaded = checklist.loads(fixture_text("valid", "empty-items"))
 		self.assertEqual(list(loaded.sections[0].items), [])
 
+	def test_the_items_of_the_whole_file_run_in_the_order_it_lists_them(self):
+		# What is true of a run rather than of a place reads the checklist as one
+		# stretch of items: whether anything is still pending (section 4), and
+		# later the report (section 7.2).
+		loaded = checklist.loads(fixture_text("valid", "complete"))
+		self.assertEqual([item.id for item in loaded.items], [1, 2, 3, 4])
+
+	def test_a_section_holding_no_items_contributes_none_to_the_whole(self):
+		loaded = checklist.loads(
+			json.dumps(
+				{
+					"checklist_name": "Base checklist",
+					"sections": [
+						{"section_name": "First", "items": [{"id": 1, "text": "An item"}]},
+						{"section_name": "Empty", "items": []},
+						{"section_name": "Last", "items": [{"id": 2, "text": "Another item"}]},
+					],
+				},
+			),
+		)
+		self.assertEqual([item.id for item in loaded.items], [1, 2])
+
 
 class TestOptionalFields(unittest.TestCase):
 	def test_an_item_without_a_status_is_pending(self):

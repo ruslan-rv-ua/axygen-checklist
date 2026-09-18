@@ -31,6 +31,12 @@ whole of the discipline: there is no other moment at which the file is brought
 up to date, as there is none for the checklist. Reading the position back is
 not a change and writes nothing; `_restore` says what that buys.
 
+**A command that changes data writes first and speaks second** (section 4).
+The two files differ in what a failed write costs and so in what is said about
+it: losing the position costs the place and is answered with a line in the log,
+while losing a verdict costs the run and refuses the command out loud, every
+time. What the tester hears then is one phrase and nothing after it.
+
 **The restore happens on construction; only its failures wait.** Reading the
 file is the first thing this plugin does, so that a reload of the plugins
 (`NVDA+Ctrl+F3`) comes back holding the same checklist. What cannot happen that
@@ -71,7 +77,7 @@ from logHandler import log
 from scriptHandler import script
 
 from . import signals, wording
-from .core import checklist, navigation, session
+from .core import checklist, navigation, progress, session, status
 from .core.checklist import Checklist
 from .core.navigation import Direction, Position, Step
 from .core.session import Session
@@ -222,6 +228,23 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 	@script(
 		description=_(
 			# Translators: The description of a command, as it appears in NVDA's Input Gestures dialog.
+			"Marks the current checklist item as passed, or as not checked if it passed already",
+		),
+		gesture="kb:NVDA+alt+space",
+	)
+	@blockAction.when(blockAction.Context.MODAL_DIALOG_OPEN)
+	def script_toggleStatus(self, gesture: inputCore.InputGesture) -> None:
+		# `getLastScriptRepeatCount` is deliberately not asked. Section 3.2.1 gives
+		# this command no series at all: a second press is another toggle, which
+		# puts the status back, and the most frequent key of the add-on is
+		# therefore never one accidental double tap away from anything
+		# destructive. Resetting a section lives behind the command mode and a
+		# Yes/No dialog instead.
+		self._toggle_status()
+
+	@script(
+		description=_(
+			# Translators: The description of a command, as it appears in NVDA's Input Gestures dialog.
 			"Reads the current item of the checklist again",
 		),
 		gesture="kb:NVDA+alt+i",
@@ -234,11 +257,10 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 		# a keypress, so a second press that did nothing would cut the first one
 		# off mid-word and leave the tester with a syllable and no explanation —
 		# indistinguishable, at the keyboard, from an add-on that has crashed.
-		loaded = self._checklist
-		position = self._position
-		if loaded is None or position is None:
-			self._say_there_is_no_item()
+		standing = self._standing()
+		if standing is None:
 			return
+		loaded, position = standing
 		self._speak(loaded, position)
 
 	def _navigate(self, direction: Direction) -> None:
@@ -253,11 +275,10 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 		the add-on go no deeper than two levels and defines no behaviour for a
 		third, and repeating the answer invents none.
 		"""
-		loaded = self._checklist
-		position = self._position
-		if loaded is None or position is None:
-			self._say_there_is_no_item()
+		standing = self._standing()
+		if standing is None:
 			return
+		loaded, position = standing
 		jump = scriptHandler.getLastScriptRepeatCount() > 0
 		if not jump:
 			self._anchor = position
@@ -324,6 +345,96 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 		"""Say the item at `position`, the way sections 3.1 and 3.3 both say it."""
 		section = navigation.section_at(loaded, position).name if name_the_section else None
 		ui.message(wording.spoken_item(navigation.item_at(loaded, position), section))
+
+	def _toggle_status(self) -> None:
+		"""Mark the current item passed, or put it back to unchecked (section 3.2.1).
+
+		The rule is total and lives in `core.status`: `passed` goes back to
+		`pending`, and any of the other four becomes `passed`.
+
+		**The file is written first and the verdict spoken second** (section 4).
+		Reversed, a failure would arrive after the word it contradicts, where
+		the next keypress cancels the speech queue and leaves the tester with
+		"passed" and every reason to believe the result is safe — the silent
+		loss the rest of section 2 is written against. The voice pays nothing
+		for the order: the write was synchronous on every press either way, and
+		all that moves is where inside that window the speech begins.
+
+		So a write that fails **refuses the command**: one phrase and nothing
+		else, no status word and no signal that the run is over. No window
+		either — the tester is in the application under test, and section 1
+		forbids taking the focus out of it. It says so on every press, because
+		a command that changes data and then falls silent is, at the keyboard,
+		an add-on that has crashed; and the change is left standing in memory,
+		because rolling it back is the mechanism section 3.2.1 was glad to be
+		rid of. Any later write carries the whole file, so the first one that
+		succeeds takes everything that has piled up with it.
+		"""
+		standing = self._standing()
+		if standing is None:
+			return
+		loaded, position = standing
+		item = navigation.item_at(loaded, position)
+		try:
+			item.record_status(status.toggled(item.status))
+		except OSError:
+			log.error(f"could not write the checklist to {loaded.path}", exc_info=True)
+			ui.message(wording.spoken_write_failure())
+			return
+		ui.message(wording.status_word(item.status))
+		self._announce_completion(loaded)
+
+	def _announce_completion(self, loaded: Checklist) -> None:
+		"""Say that the run is over, when this status left nothing pending.
+
+		Section 4, and it belongs to every path that gives an item a status —
+		the quick toggle, a digit of the command mode, the combo box of the
+		item dialog — rather than to any one of them. It is news about the run,
+		so auto-advance has no say in whether it is spoken, and the condition
+		is the measure `core.progress` counts by everywhere: nothing still
+		`pending`, rather than everything passed. A checklist holding one
+		failure is finished work.
+
+		A write that failed never reaches here, and that is the point: the
+		phrase would be claiming something about the run that the disk does not
+		say.
+
+		**The tone will be heard before the verdict it follows**, and that is
+		accepted rather than overlooked. `ui.message` puts the status word in
+		the speech queue while `tones.beep` sounds straight away, so the order
+		written here — section 4's "additionally plays a signal and speaks" —
+		is the order of the sentence rather than of the ear. Interleaving them
+		properly would mean a `BeepCommand` inside a speech sequence, which
+		costs both rules it would break: section 4 sends every message through
+		`ui.message`, and `signals` is the only module that touches `tones`, so
+		that the four signals can be picked to differ from one another.
+		"""
+		counted = progress.of(loaded.items)
+		if not counted.finished:
+			return
+		signals.checklist_finished()
+		ui.message(wording.spoken_completion(counted))
+
+	def _standing(self) -> tuple[Checklist, Position] | None:
+		"""The checklist and the place in it a command works on, or None for neither.
+
+		Every command begins by asking this, because every command needs both
+		halves and neither is promised: no checklist has been opened until
+		`state.json` or the file dialog puts one here, and a checklist whose
+		sections are all empty is valid and has nowhere to stand in (section 2).
+
+		None means the reason has **already been spoken** and the caller has
+		nothing left to do but return. Saying it here rather than at each call
+		site is what keeps the two states of section 4 told apart in one place;
+		`_say_there_is_no_item` is where the difference between them is written
+		down.
+		"""
+		loaded = self._checklist
+		position = self._position
+		if loaded is None or position is None:
+			self._say_there_is_no_item()
+			return None
+		return loaded, position
 
 	def _say_there_is_no_item(self) -> None:
 		"""Section 4: why a command found nothing to work on, worded in one place.

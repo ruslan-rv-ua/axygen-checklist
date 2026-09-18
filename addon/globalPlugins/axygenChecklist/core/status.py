@@ -44,3 +44,19 @@ def is_verdict(status: str) -> bool:
 	left outside it — three behaviours, one measure.
 	"""
 	return status != PENDING
+
+
+def toggled(value: str) -> str:
+	"""The status the quick toggle gives an item that currently has `value`.
+
+	Section 3.2.1: `passed` goes back to `pending`, and **any** other status
+	becomes `passed`. The rule is total on purpose — the other three verdicts
+	are reachable through the command mode and the item dialog (section 3.2),
+	and a toggle that only knew two states would be undefined on them.
+
+	Nothing here is a series. A second press is simply another toggle, which
+	puts `pending` and `passed` back where they were and leaves a third state
+	at `passed`; section 3.2.1 wants the most frequent key of the add-on to
+	cost nothing when the hand presses it twice.
+	"""
+	return PENDING if value == PASSED else PASSED
