@@ -18,7 +18,7 @@ Axygen Checklist проводить тестувальника чеклісто�
 [як писати чекліст](https://github.com/ruslan-rv-ua/axygen-checklist/blob/develop/docs/checklist-format.md)
 (англійською), поруч —
 [схема JSON](https://github.com/ruslan-rv-ua/axygen-checklist/blob/develop/docs/checklist-v1.schema.json)
-і готовий фрагмент для `AGENTS.md` вашого проєкту. Варто прочитати, перш ніж
+і готовий блок для `AGENTS.md` вашого проєкту. Варто прочитати, перш ніж
 пускати агента правити чекліст, який хтось уже проходив: статуси й коментарі в
 ньому — робота тестувальника, а не те, що агент має право перегенерувати.
 

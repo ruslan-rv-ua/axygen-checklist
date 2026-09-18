@@ -87,9 +87,9 @@ def iter_fenced_blocks(text: str, info: str) -> Iterator[str]:
 
 
 def is_whole_checklist(document: object) -> bool:
-	"""Whether a parsed block is a whole file rather than a fragment.
+	"""Whether a parsed block is a whole file rather than a partial example.
 
-	Counterexamples in the documentation are written as fragments precisely so
+	Counterexamples in the documentation are written as partial examples, so
 	that this returns false for them; see section 2 of `requirements.md`.
 	"""
 	return isinstance(document, dict) and "checklist_name" in document
@@ -162,7 +162,7 @@ class TestSamples(unittest.TestCase):
 			with self.subTest(sample=path.name):
 				document = json.loads(path.read_text(encoding="utf-8"))
 				# A sample is a file a tester opens, so unlike the documented
-				# counterexamples a fragment here would be a mistake.
+				# counterexamples a partial example here would be a mistake.
 				self.assertTrue(is_whole_checklist(document), "not a whole checklist")
 				self.assertEqual(contract_errors(document), [])
 
@@ -183,13 +183,13 @@ class TestDocumentedExamples(unittest.TestCase):
 		# test into a no-op, so the count is asserted rather than trusted.
 		self.assertGreaterEqual(checked, 3, "expected the documented examples to be found")
 
-	def test_documented_fragments_are_not_mistaken_for_files(self):
-		# The counterexample in the authoring guide is a fragment on purpose:
+	def test_documented_partial_examples_are_not_mistaken_for_files(self):
+		# The counterexample in the authoring guide is partial on purpose:
 		# a whole invalid file in the documentation would fail the test above.
 		guide = (REPO_ROOT / "docs" / "checklist-format.md").read_text(encoding="utf-8")
-		fragments = [
+		partial_examples = [
 			block
 			for block in iter_fenced_blocks(guide, "json")
 			if not is_whole_checklist(json.loads(block))
 		]
-		self.assertTrue(fragments, "expected at least one fragment in the authoring guide")
+		self.assertTrue(partial_examples, "expected a partial example in the guide")

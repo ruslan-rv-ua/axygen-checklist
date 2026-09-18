@@ -64,9 +64,9 @@ has checked it, and it reads as `"pending"`.
 | `section_name` | section | string | **yes** | Name of the section. |
 | `items` | section | array | **yes** | May be empty. |
 | `id` | item | integer | **yes** | Unique within the file. See [Identifiers](#identifiers). |
-| `text` | item | string | **yes** | What is spoken when the tester reaches the item. |
+| `text` | item | string | **yes** | What is spoken when the tester reaches the item. May carry [fragments](#fragments). |
 | `status` | item | string | no | One of the five below. Absent means `"pending"`. |
-| `note` | item | string | no | A hint from the author, spoken right after `text`. |
+| `note` | item | string | no | A hint from the author, spoken right after `text`. May carry fragments too. |
 | `comment` | item | string | no | The tester's conclusion. Not yours to write. |
 
 Unknown fields are allowed. The add-on ignores them when reading and keeps them
@@ -197,14 +197,54 @@ spoken right after the item, which is exactly when it is needed.
 
 **Spell out a key whose name is punctuation.** Write "Ctrl plus comma", not
 `Ctrl+,`: what a synthesiser does with a bare comma depends on the tester's
-punctuation setting, and it may come out as a pause or as nothing. A command
-suffers worse than a key, because the punctuation is the part that matters —
-`.\app.exe` can reach the ear as the plain name of the app, which is the exact
-thing the item was telling them not to type.
+punctuation setting, and it may come out as a pause or as nothing. A key is
+pressed, not reproduced, so words are all it needs.
 
-Keep the writing plain. `text` and `note` are spoken, not rendered: emphasis
-markers and backticks buy nothing, and depending on the reader's punctuation
-settings they may be read out.
+A string the tester has to reproduce exactly is a different problem, and words
+are the wrong answer to it. See [Fragments](#fragments).
+
+Keep the rest of the writing plain. `text` and `note` are spoken, not rendered,
+and emphasis markers do not survive the trip: at NVDA's default punctuation
+level `*` is read aloud as "star", so `**important**` reaches the ear as "star
+star important star star". Headings, lists and tables have nowhere to render
+either. Backticks are the one marker that means something, and they are not
+decoration.
+
+### Fragments
+
+A fragment is an exact string the tester has to reproduce somewhere else: a URL,
+a path, a command, an identifier, a piece of test data. Mark it with single
+backticks, and the add-on will offer it for copying — the tester gets the string
+into the clipboard instead of transcribing it by ear.
+
+```json
+{"id": 12, "text": "Open `http://localhost:8080` - the home page appears", "note": "The port comes from `config.toml`"}
+```
+
+An exact string does not survive being read aloud. A backslash is silent at
+NVDA's default settings and a dot comes out as the word "dot", so `.\app.exe`
+reaches the ear as the bare name of the app — the exact thing the item was
+telling the tester not to type. Spelling it out in words ("dot, backslash,
+app.exe") rescues the ear at the file's expense: the exact string is no longer
+in the file at all. A fragment keeps it exact and takes the transcription away
+from the tester.
+
+What to know while writing them:
+
+* **Backticks are the only marker.** Quotes of any kind carry no meaning to the
+  add-on, and in these checklists they already mean close to the opposite: a
+  string in quotes is something the tester should **hear or see**, like the
+  label of a menu item. Keep using them for that.
+* **One pair, one fragment.** An odd backtick is left alone as ordinary text,
+  and a fragment may not span a line break.
+* An empty pair produces no fragment, and spaces just inside a pair are
+  trimmed.
+* **The backticks stay visible.** They are part of `text`, so they reach the
+  add-on's tree, braille, and the speech of a tester who has raised NVDA's
+  punctuation level. At the default level they are silent.
+* Fragments are collected from `text` and `note` only. `comment` is the
+  tester's.
+* A fragment cannot itself contain a backtick. There is no escape for that.
 
 ## Validation
 
@@ -279,6 +319,10 @@ Format: https://github.com/ruslan-rv-ua/axygen-checklist/blob/develop/docs/check
 * You write `checklist_name`, `section_name`, `id`, `text` and `note`.
 * One item is one action plus the result you expect; preconditions go in a
   first section of their own.
+* Wrap an exact string the tester has to reproduce - a URL, a path, a command,
+  an identifier - in single backticks: ``"text": "Open `http://localhost:8080`"``.
+  The add-on copies those to the clipboard on request, which beats reading
+  punctuation aloud. Nothing else in the text is markup.
 * `status` (`pending` / `passed` / `failed` / `blocked` / `skipped`) and
   `comment` belong to the tester and are written by the add-on. When editing an
   existing checklist, re-read the file first and preserve both verbatim. Never
