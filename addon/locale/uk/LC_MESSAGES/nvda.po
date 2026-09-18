@@ -5,7 +5,8 @@
 msgid ""
 msgstr ""
 "Project-Id-Version: 'axygenChecklist' '0.0.0'\n"
-"Report-Msgid-Bugs-To: 'nvda-translations@groups.io'\n"
+"Report-Msgid-Bugs-To: 'https://github.com/ruslan-rv-ua/axygen-checklist/"
+"issues'\n"
 "PO-Revision-Date: 2026-09-16 20:04+0300\n"
 "Last-Translator: Ruslan Iskov <ruslan.rv.ua@gmail.com>\n"
 "Language-Team: Ukrainian\n"
@@ -13,19 +14,68 @@ msgstr ""
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"Plural-Forms: nplurals=3; plural=(n%10==1 && n%100!=11 ? 0 : n%10>=2 && n%10<=4 && (n%100<10 || n%100>=20) ? 1 : 2);\n"
+"Plural-Forms: nplurals=3; plural=(n%10==1 && n%100!=11 ? 0 : n%10>=2 && "
+"n%10<=4 && (n%100<10 || n%100>=20) ? 1 : 2);\n"
+
+# The product name is deliberately left in English in every locale: it is the name the
+# add-on carries in the Add-on Store, in the configuration directory and in its documentation.
+#. Translators: The title of the add-on's confirmation dialogs: the product name,
+#. which is not translated in any locale.
+#. Translators: The name of the category this add-on's commands appear under
+#. in NVDA's Input Gestures dialog.
+#. Add-on summary/title, usually the user visible name of the add-on
+#. Translators: Summary/title for this add-on
+#. to be shown on installation and add-on information found in add-on store
+msgid "Axygen Checklist"
+msgstr "Axygen Checklist"
+
+#. Translators: The status of a checklist item that has been checked and works.
+msgid "passed"
+msgstr "пройдено"
+
+#. Translators: The status of a checklist item that has been checked and does not work.
+msgid "failed"
+msgstr "провалено"
+
+#. Translators: The status of a checklist item that could not be checked because
+#. something else is in the way.
+msgid "blocked"
+msgstr "заблоковано"
+
+#. Translators: The status of a checklist item that was deliberately left unchecked.
+msgid "skipped"
+msgstr "пропущено"
+
+#. Translators: The status of a checklist item that has not been checked yet.
+msgid "not checked"
+msgstr "не перевірено"
+
+#. Translators: Spoken after the status of a checklist item the tester has
+#. commented on. The comment itself is not spoken; the item dialog shows it.
+msgid "has a comment"
+msgstr "є коментар"
+
+#. Translators: Spoken when a checklist file was written by a newer version of
+#. the add-on than the one running, which cannot know what is in it.
+msgid "This file was created by a newer version of the add-on"
+msgstr "Файл створено новішою версією додатка"
+
+#. Translators: Spoken when a checklist file cannot be read, or holds something
+#. that is not a valid checklist.
+msgid "Error reading the file"
+msgstr "Помилка читання файлу"
 
 #. Translators: Spoken when a change to the checklist could not be written to the
 #. file, so it is in memory but not on disk.
 msgid "Error writing the file"
 msgstr "Помилка запису файлу"
 
+# The first form covers 1, 21, 31 and so on, where "всі" reads as a flourish in
+# Ukrainian too; the other two carry it.
 #. Translators: Spoken when the last item of a checklist has been given a
 #. status, so nothing in it is left unchecked. {count} is how many items
 #. the checklist holds. The word "All" is dropped from the singular, where
 #. it reads as a flourish over a count of one.
-# The first form covers 1, 21, 31 and so on, where "всі" reads as a flourish in
-# Ukrainian too; the other two carry it.
 #, python-brace-format
 msgid "Checklist complete! {count} item processed"
 msgid_plural "Checklist complete! All {count} items processed"
@@ -45,17 +95,26 @@ msgstr "Розділ: {name}, опрацьовано {processed} з {total}"
 msgid ", {count} failed"
 msgstr ", провалено {count}"
 
-#. Translators: The name of the category this add-on's commands appear under
-#. in NVDA's Input Gestures dialog.
-#. Translators: The title of the add-on's confirmation dialogs: the product name,
-#. which is not translated in any locale.
-#. Add-on summary/title, usually the user visible name of the add-on
-#. Translators: Summary/title for this add-on
-#. to be shown on installation and add-on information found in add-on store
-# The product name is deliberately left in English in every locale: it is the name the
-# add-on carries in the Add-on Store, in the configuration directory and in its documentation.
-msgid "Axygen Checklist"
-msgstr "Axygen Checklist"
+#. Translators: Spoken when NVDA starts and the checklist that was open
+#. last time is no longer where it was.
+msgid "Checklist file not found"
+msgstr "Файл чекліста не знайдено"
+
+#. Translators: The description of a command, as it appears in NVDA's Input Gestures dialog.
+msgid ""
+"Moves to the next item of the checklist. Twice: to the first item of the "
+"next section"
+msgstr ""
+"Переходить до наступного пункту чекліста. Двічі — до першого пункту "
+"наступного розділу"
+
+#. Translators: The description of a command, as it appears in NVDA's Input Gestures dialog.
+msgid ""
+"Moves to the previous item of the checklist. Twice: to the first item of the "
+"previous section"
+msgstr ""
+"Переходить до попереднього пункту чекліста. Двічі — до першого пункту "
+"попереднього розділу"
 
 #. Translators: The description of a command, as it appears in NVDA's Input Gestures dialog.
 msgid ""
@@ -64,6 +123,10 @@ msgid ""
 msgstr ""
 "Позначає поточний пункт чекліста пройденим, а вже пройдений повертає в «не "
 "перевірено»"
+
+#. Translators: The description of a command, as it appears in NVDA's Input Gestures dialog.
+msgid "Reads the current item of the checklist again"
+msgstr "Повторює озвучення поточного пункту чекліста"
 
 #. Translators: The description of a command, as it appears in NVDA's Input Gestures dialog.
 msgid "Arms the command mode of the checklist for three seconds"
@@ -90,9 +153,26 @@ msgstr ""
 "Скинути розділ? Будуть стерті всі статуси та коментарі розділу. Цю дію не "
 "можна відмінити."
 
+#. Translators: Spoken when there is no section after this one to jump to.
+msgid "End of list"
+msgstr "Кінець списку"
+
+#. Translators: Spoken when there is no section before this one to jump to.
+msgid "Start of list"
+msgstr "Початок списку"
+
 #. Translators: Spoken after the current section of the checklist has been reset.
 msgid "Section reset"
 msgstr "Розділ скинуто"
+
+#. Translators: Spoken when a command is used before a checklist has been opened.
+msgid "No checklist loaded"
+msgstr "Чекліст не завантажено"
+
+#. Translators: Spoken when a command is used on a checklist whose sections
+#. are all empty, so there is no item to stand on.
+msgid "The checklist has no items"
+msgstr "У чеклісті немає пунктів"
 
 #. Add-on description
 #. Translators: Long description to be shown for this add-on on add-on information from add-on store
@@ -103,11 +183,88 @@ msgid ""
 "speech, without ever leaving the window being tested.\n"
 "Checklists are plain JSON files that record the result of the run."
 msgstr ""
-"Проходить чекліст тестування глобальними командами, лишаючи системний фокус у тестованому застосунку.\n"
-"Пункти позначаються як пройдені, провалені чи пропущені, коментуються та озвучуються — не полишаючи вікна, яке перевіряють.\n"
+"Проходить чекліст тестування глобальними командами, лишаючи системний фокус "
+"у тестованому застосунку.\n"
+"Пункти позначаються як пройдені, провалені чи пропущені, коментуються та "
+"озвучуються — не полишаючи вікна, яке перевіряють.\n"
 "Чеклісти є звичайними файлами JSON, що зберігають результат прогону."
 
 #. Brief changelog for this version
 #. Translators: what's new content for the add-on version to be shown in the add-on store
 msgid "First development version."
 msgstr "Перша версія в розробці."
+
+#~ msgid "Open a checklist"
+#~ msgstr "Відкрити чекліст"
+
+#~ msgid "Checklist files"
+#~ msgstr "Файли чеклістів"
+
+#~ msgid "All files"
+#~ msgstr "Усі файли"
+
+#, python-brace-format
+#~ msgid "Section {section}"
+#~ msgstr "Розділ {section}"
+
+#, python-brace-format
+#~ msgid "Section {section}, item {item}"
+#~ msgstr "Розділ {section}, пункт {item}"
+
+#, python-brace-format
+#~ msgid ", id {id}"
+#~ msgstr ", id {id}"
+
+#~ msgid "The file is not valid JSON."
+#~ msgstr "Файл не є коректним JSON."
+
+#, python-brace-format
+#~ msgid "The required field \"{field}\" is missing."
+#~ msgstr "Обов'язкове поле «{field}» відсутнє."
+
+#, python-brace-format
+#~ msgid "The field \"{field}\" must be text, but holds {value}."
+#~ msgstr "Поле «{field}» має бути текстом, а містить {value}."
+
+#, python-brace-format
+#~ msgid "The field \"{field}\" must be a whole number, but holds {value}."
+#~ msgstr "Поле «{field}» має бути цілим числом, а містить {value}."
+
+#, python-brace-format
+#~ msgid "The field \"{field}\" must be a list, but holds {value}."
+#~ msgstr "Поле «{field}» має бути списком, а містить {value}."
+
+#~ msgid ""
+#~ "The field \"sections\" is empty; a checklist needs at least one section."
+#~ msgstr ""
+#~ "Поле «sections» порожнє: чекліст потребує щонайменше одного розділу."
+
+#, python-brace-format
+#~ msgid "The id {value} belongs to more than one item."
+#~ msgstr "Ідентифікатор {value} належить більш ніж одному пункту."
+
+#, python-brace-format
+#~ msgid ""
+#~ "The field \"status\" holds {value}, which is not one of \"pending\", "
+#~ "\"passed\", \"failed\", \"blocked\" and \"skipped\"."
+#~ msgstr ""
+#~ "Поле «status» містить {value} — значення, якого немає серед «pending», "
+#~ "«passed», «failed», «blocked» і «skipped»."
+
+#, python-brace-format
+#~ msgid ""
+#~ "The field \"format_version\" holds {value}, which is not a version of "
+#~ "this format."
+#~ msgstr "Поле «format_version» містить {value} — це не версія цього формату."
+
+#~ msgid "The file does not hold a checklist."
+#~ msgstr "Файл не містить чекліста."
+
+#~ msgid "This section is not written as a section."
+#~ msgstr "Цей розділ записано не як розділ."
+
+#~ msgid "This item is not written as an item."
+#~ msgstr "Цей пункт записано не як пункт."
+
+#~ msgid "Opens a checklist file"
+#~ msgstr "Відкриває файл чекліста"
