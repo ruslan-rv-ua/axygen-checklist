@@ -55,3 +55,17 @@ git-flow у реалізації `git-flow-next`, конфіг у комітов
 Значення поля `status` у JSON (`passed`, `failed`, …) — ідентифікатори, а не текст, і не перекладаються ніколи: інакше файл чекліста перестав би бути переносним між локалями.
 
 Назва продукту «Axygen Checklist» так само не перекладається в жодній локалі: під нею аддон значиться в Add-on Store, у теці конфігурації та в документації (§6 спеки).
+
+## Навички агентів
+
+### Трекер задач
+
+Задачі й специфікації живуть як GitHub Issues у `ruslan-rv-ua/axygen-checklist`; усі операції — через `gh`. Див. [`docs/agents/issue-tracker.md`](docs/agents/issue-tracker.md).
+
+### Мітки тріажу
+
+П'ять канонічних ролей тріажу зі стандартними назвами (`needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`). Див. [`docs/agents/triage-labels.md`](docs/agents/triage-labels.md).
+
+### Доменні документи
+
+Одноконтекстний репозиторій: `CONTEXT.md` і `docs/adr/` у корені, обидва створюються ліниво. Див. [`docs/agents/domain.md`](docs/agents/domain.md).
