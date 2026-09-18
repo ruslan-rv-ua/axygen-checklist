@@ -447,10 +447,7 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 				"Reset the section? Every status and comment in the section will be erased. "
 				"This cannot be undone.",
 			),
-			# Translators: The title of the add-on's windows: the product name, which is
-			# not translated in any locale.
-			_("Axygen Checklist"),
-			then=lambda: self._reset_section(loaded, section),
+			on_yes=lambda: self._reset_section(loaded, section),
 		)
 
 	def _navigate(self, direction: Direction) -> None:
@@ -585,21 +582,27 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 	def _reset_section(self, loaded: Checklist, section: Section) -> None:
 		"""Put every item of `section` back to pending, erase its comments, say so.
 
-		The tester has just answered "Yes" (section 3.2.2), and the focus is
-		already back in the application under test — NVDA is announcing that
-		window, and this phrase stands after it. That is why there is a phrase
-		at all: a reset that said nothing would sound exactly like a reset that
-		did not happen, which is the rule section 4 holds every change to.
+		The tester has just answered "Yes" (section 3.2.2), and the focus is on
+		its way back to the application under test — NVDA is about to announce
+		that window, and this phrase has to stand after it rather than under
+		it, which is what `modal.message` is for (section 6). That there is a
+		phrase at all is the rule section 4 holds every change to: a reset that
+		said nothing would sound exactly like a reset that did not happen.
 
 		No end-of-run notice, and none possible: the section held an item to
 		stand on, and every item in it is pending now.
 		"""
-		if not self._write(loaded, section.reset):
+		if not self._write(loaded, section.reset, say=modal.message):
 			return
 		# Translators: Spoken after the current section of the checklist has been reset.
-		ui.message(_("Section reset"))
+		modal.message(_("Section reset"))
 
-	def _write(self, loaded: Checklist, change: Callable[[], None]) -> bool:
+	def _write(
+		self,
+		loaded: Checklist,
+		change: Callable[[], None],
+		say: Callable[[str], None] = ui.message,
+	) -> bool:
 		"""Make `change`, which rewrites the file, and say so only when it did not get there.
 
 		Every command that changes data comes through here, and section 4
@@ -622,12 +625,17 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 		mechanism section 3.2.1 was glad to be rid of. Any later write carries
 		the whole file, so the first one that succeeds takes everything that
 		has piled up with it.
+
+		`say` is how that phrase reaches the tester: `ui.message` from a
+		command that runs with the focus where it was, and `modal.message` from
+		one that has just closed a window and would otherwise be cut off by
+		the focus coming back (section 6).
 		"""
 		try:
 			change()
 		except OSError:
 			log.error(f"could not write the checklist to {loaded.path}", exc_info=True)
-			ui.message(wording.spoken_write_failure())
+			say(wording.spoken_write_failure())
 			return False
 		return True
 

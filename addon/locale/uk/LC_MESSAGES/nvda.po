@@ -47,8 +47,8 @@ msgstr ", провалено {count}"
 
 #. Translators: The name of the category this add-on's commands appear under
 #. in NVDA's Input Gestures dialog.
-#. Translators: The title of the add-on's windows: the product name, which is
-#. not translated in any locale.
+#. Translators: The title of the add-on's confirmation dialogs: the product name,
+#. which is not translated in any locale.
 #. Add-on summary/title, usually the user visible name of the add-on
 #. Translators: Summary/title for this add-on
 #. to be shown on installation and add-on information found in add-on store
