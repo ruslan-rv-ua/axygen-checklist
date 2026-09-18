@@ -396,11 +396,10 @@ def _as_object(data: dict[str, Any], opened: dict[str, str], indent: str) -> str
 	"""
 	if not data:
 		return "{}"
-	pairs = [
-		f"{json.dumps(key, ensure_ascii=False)}: "
-		f"{opened[key] if key in opened else json.dumps(value, ensure_ascii=False)}"
-		for key, value in data.items()
-	]
+	pairs: list[str] = []
+	for key, value in data.items():
+		body = opened[key] if key in opened else json.dumps(value, ensure_ascii=False)
+		pairs.append(f"{json.dumps(key, ensure_ascii=False)}: {body}")
 	return "{\n" + ",\n".join(indent + pair for pair in pairs) + "\n" + indent[: -len(_INDENT)] + "}"
 
 

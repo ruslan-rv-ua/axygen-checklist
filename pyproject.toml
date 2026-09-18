@@ -55,6 +55,11 @@ lint = [
 	"ruff==0.14.5",
 	"prek==0.4.8",
 	"pyright[nodejs]==1.1.407",
+	# Types for the add-on's windows. Only the CI type check reads it (pyrightconfig.ci.json);
+	# nothing here ever runs wx. Pinned to the wxPython that ships inside the NVDA named by
+	# `addon_lastTestedNVDAVersion` in buildVars.py, and raised together with it. Windows only:
+	# PyPI has no Linux wheels for wxPython, and the sdist compiles wxWidgets from source.
+	"wxPython==4.2.2; sys_platform == 'win32'",
 ]
 # Unit tests. `jsonschema` is tooling, never shipped: the add-on validates
 # checklists with its own pass, and section 7.3 of docs/requirements.md says why.
@@ -132,11 +137,14 @@ exclude = [
 	"site_scons",
 	".github/scripts",
 	"tests",
-	# The add-on imports NVDA's own modules, which resolve only against a checkout of the
-	# NVDA repository at ../nvda (see extraPaths below). Without it every symbol taken from
-	# NVDA is unknown and strict mode reports the whole file. Drop this line once ../nvda
-	# exists locally and in CI; see docs/development.md.
-	"addon",
+	# The shell of the add-on: the modules that import NVDA's own packages, which resolve
+	# only against a checkout of the NVDA repository at ../nvda (see extraPaths below).
+	# Without it every symbol taken from NVDA is unknown and strict mode reports the whole
+	# file. The core under addon/globalPlugins/axygenChecklist/core/ imports nothing of NVDA
+	# and stays in. A new shell sub-package must be added here; forgetting it is loud, not
+	# silent: the first `import wx` floods this check with unknown types. CI checks the shell
+	# against NVDA's source with pyrightconfig.ci.json; see docs/development.md.
+	"addon/globalPlugins/axygenChecklist/*.py",
 	# When excluding concrete paths relative to a directory,
 	# not matching multiple folders by name e.g. `__pycache__`,
 	# paths are relative to the configuration file.

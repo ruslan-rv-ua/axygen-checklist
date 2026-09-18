@@ -8,7 +8,11 @@ on:
 jobs:
   checks:
     name: Lint, type check and unit tests
-    runs-on: ubuntu-latest
+    # Windows, unlike the template's other workflows: the type check needs wxPython, which
+    # PyPI ships as wheels for Windows and macOS only (the Linux sdist compiles wxWidgets
+    # from source), and the add-on itself only ever runs on Windows, so the unit tests meet
+    # the file system they will run on.
+    runs-on: windows-latest
 
     steps:
       - name: Checkout repository
@@ -25,8 +29,9 @@ jobs:
       - name: Lint and format
         run: uv run prek run --all-files
 
-      # The add-on's modules resolve only against NVDA's own source, which is why
-      # pyproject.toml excludes addon/ from the default pyright configuration.
+      # The shell of the add-on resolves only against NVDA's own source, which is why
+      # pyproject.toml excludes it from the default pyright configuration. wxPython, the
+      # other thing the windows import, came in with `uv sync` above.
       - name: Type check the add-on against NVDA's source
         run: |
           git clone --depth 1 https://github.com/nvaccess/nvda.git ../nvda

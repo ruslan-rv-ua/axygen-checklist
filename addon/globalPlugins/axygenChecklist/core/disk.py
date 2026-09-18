@@ -45,7 +45,7 @@ def write(path: Path, text: str) -> None:
 		# ever runs on Windows, but a checklist is a data file that usually
 		# lives in version control beside the product under test, so what it
 		# writes is the same on every machine that reads the repository.
-		temporary.write_text(text, encoding="utf-8", newline="\n")
+		_ = temporary.write_text(text, encoding="utf-8", newline="\n")
 		os.replace(temporary, path)
 	except OSError:
 		with contextlib.suppress(OSError):

@@ -50,8 +50,9 @@ or the add-on being enabled from the Add-on Store — restores in silence. That
 is the right way round: the tester is looking at a dialog they opened, not at
 the application under test, and the very next command tells them where they
 stand anyway. Asking NVDA whether it has finished starting is what would settle
-this properly, and there is no public way to: the flag is private, and `wx`
-cannot be imported by this add-on at all under the type check CI runs.
+this properly, and there is no public way to: the flag is private, and the
+nearest public thing, whether the `wx` main loop is running, is a proxy and not
+the fact, since the loop is up before the first focus has been reported.
 
 Opening a checklist any other way — the file dialog of section 3.2.2, the GUI
 of section 5 — is still to come; until it arrives, the file named in
