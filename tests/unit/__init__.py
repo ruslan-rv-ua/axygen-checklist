@@ -18,8 +18,8 @@ import: unittest imports a package before the test modules inside it, whereas
 two import lines in a test module would have to stay in the right order for
 `core` to resolve at all.
 
-Stubbing NVDA's own modules is deliberately not an option; see
-"Межа ядра й оболонки" in docs/development.md.
+Stubbing NVDA's own modules is deliberately not an option; see the section on
+the core/shell boundary in docs/development.md.
 """
 
 import sys

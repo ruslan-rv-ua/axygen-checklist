@@ -27,8 +27,13 @@ def fixture_text(kind: str, name: str) -> str:
 	return fixture_path(kind, name).read_text(encoding="utf-8")
 
 
+def fixture_paths(kind: str) -> list[Path]:
+	"""Paths of every fixture under `tests/fixtures/<kind>`, sorted."""
+	paths = sorted((FIXTURES / kind).glob("*.json"))
+	assert paths, f"no fixtures under {kind}"
+	return paths
+
+
 def fixture_names(kind: str) -> list[str]:
 	"""Names of every fixture under `tests/fixtures/<kind>`, sorted."""
-	names = sorted(path.stem for path in (FIXTURES / kind).glob("*.json"))
-	assert names, f"no fixtures under {kind}"
-	return names
+	return [path.stem for path in fixture_paths(kind)]

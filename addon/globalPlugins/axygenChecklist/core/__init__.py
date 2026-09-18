@@ -9,8 +9,8 @@ Nothing under this package may import NVDA's own modules — `ui`, `wx`,
 `config`, `addonHandler` and the rest exist only inside a running screen
 reader, and a module that reaches for them cannot be imported by the unit
 tests at all. The import is the rule: a green test run is the proof that the
-core is free of NVDA, and no separate check is needed. See "Межа ядра й
-оболонки" in docs/development.md for what falls on each side of the line.
+core is free of NVDA, and no separate check is needed. The section on the
+core/shell boundary in docs/development.md says what falls on each side.
 
 For the same reason the core is never told how to find anything. The
 configuration directory is known to `config`, the path of a checklist to the

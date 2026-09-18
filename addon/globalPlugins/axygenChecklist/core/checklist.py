@@ -219,15 +219,23 @@ def loads(text: str) -> Checklist:
 def load(path: str | Path) -> Checklist:
 	"""Read the checklist stored at `path`.
 
-	Raises `ChecklistError` if the file breaks the contract, and `OSError` if
-	it cannot be read at all. The two are kept apart on purpose: a file that is
-	not there is answered by section 2 with "Checklist file not found" and a
-	file dialog, not with the reason a file was refused.
+	Raises `ChecklistError` if the file cannot be read as a checklist, and
+	`OSError` if it cannot be read at all. The two are kept apart on purpose: a
+	file that is not there is answered by section 2 with "Checklist file not
+	found" and a file dialog, not with the reason a file was refused.
 	"""
-	# `utf-8-sig` rather than `utf-8`: checklists are written by hand on
-	# Windows, editors there still put a byte order mark at the front, and
-	# `json` chokes on it. Without a mark the two are the same codec.
-	return loads(Path(path).read_text(encoding="utf-8-sig"))
+	try:
+		# `utf-8-sig` rather than `utf-8`: checklists are written by hand on
+		# Windows, editors there still put a byte order mark at the front, and
+		# `json` chokes on it. Without a mark the two are the same codec.
+		text = Path(path).read_text(encoding="utf-8-sig")
+	except UnicodeDecodeError as error:
+		# A checklist saved in some other encoding is a file that could not be
+		# read, which section 4 answers with the same short message as broken
+		# JSON. Letting the decoder's own exception out would be the silence in
+		# the middle of a session that section 2 exists to prevent.
+		raise _refusal(ProblemKind.NOT_JSON) from error
+	return loads(text)
 
 
 @dataclasses.dataclass(frozen=True)
@@ -357,20 +365,18 @@ def _validated(document: Any) -> dict[str, Any]:
 		raise _refusal(ProblemKind.NO_SECTIONS, _NOWHERE, "sections")
 	seen_ids: set[int] = set()
 	for section_index, section in enumerate(sections):
-		_validate_section(section, section_index, seen_ids)
+		_validate_section(section, _Where(section_index=section_index), seen_ids)
 	return mapping
 
 
-def _validate_section(section: Any, section_index: int, seen_ids: set[int]) -> None:
-	where = _Where(section_index=section_index)
+def _validate_section(section: Any, where: _Where, seen_ids: set[int]) -> None:
 	data = _read_object(section, where)
 	_check_string(data, "section_name", where)
 	for item_index, item in enumerate(_read_array(data, "items", where)):
-		_validate_item(item, section_index, item_index, seen_ids)
+		_validate_item(item, dataclasses.replace(where, item_index=item_index), seen_ids)
 
 
-def _validate_item(item: Any, section_index: int, item_index: int, seen_ids: set[int]) -> None:
-	where = _Where(section_index=section_index, item_index=item_index)
+def _validate_item(item: Any, where: _Where, seen_ids: set[int]) -> None:
 	data = _read_object(item, where)
 	identifier = _read_integer(data, "id", where)
 	# Everything after this point can name the item the way the author does.

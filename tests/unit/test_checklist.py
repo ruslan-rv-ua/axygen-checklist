@@ -127,6 +127,9 @@ class TestValidationContract(unittest.TestCase):
 		"missing-item-id": (checklist.ProblemKind.MISSING_FIELD, "id"),
 		"missing-item-text": (checklist.ProblemKind.MISSING_FIELD, "text"),
 		"type-checklist-name": (checklist.ProblemKind.NOT_A_STRING, "checklist_name"),
+		"type-section-name": (checklist.ProblemKind.NOT_A_STRING, "section_name"),
+		"type-note": (checklist.ProblemKind.NOT_A_STRING, "note"),
+		"type-format-version": (checklist.ProblemKind.NOT_AN_INTEGER, "format_version"),
 		"type-sections": (checklist.ProblemKind.NOT_AN_ARRAY, "sections"),
 		"type-items": (checklist.ProblemKind.NOT_AN_ARRAY, "items"),
 		"type-item-id": (checklist.ProblemKind.NOT_AN_INTEGER, "id"),
@@ -207,9 +210,9 @@ class TestReasons(unittest.TestCase):
 
 class TestFormatVersion(unittest.TestCase):
 	def test_a_newer_file_is_refused_on_its_own_terms(self):
-		# Section 2: the one violation with a message of its own. "Помилка
-		# читання файлу" would send the tester looking for broken JSON that is
-		# not there; this one sends them to update the add-on.
+		# Section 2: the one violation with a message of its own. The short
+		# "could not read the file" would send the tester looking for broken
+		# JSON that is not there; this one sends them to update the add-on.
 		with self.assertRaises(checklist.ChecklistError) as refusal:
 			checklist.loads(fixture_text("invalid", "format-version-too-high"))
 		self.assertEqual(refusal.exception.problem.kind, checklist.ProblemKind.FUTURE_FORMAT)
@@ -228,8 +231,10 @@ class TestFormatVersion(unittest.TestCase):
 		self.assertEqual(refusal.exception.problem.kind, checklist.ProblemKind.FUTURE_FORMAT)
 
 	def test_a_format_version_that_is_not_a_number_is_an_ordinary_violation(self):
+		# Only a version above the known one earns the message of its own; a
+		# broken one is a type breach like any other.
 		with self.assertRaises(checklist.ChecklistError) as refusal:
-			checklist.loads(json.dumps({"format_version": "1", "checklist_name": "x", "sections": []}))
+			checklist.loads(fixture_text("invalid", "type-format-version"))
 		self.assertEqual(refusal.exception.problem.kind, checklist.ProblemKind.NOT_AN_INTEGER)
 
 
@@ -290,6 +295,19 @@ class TestLoadingFromDisk(unittest.TestCase):
 		# file dialog, which is a different answer from "this file is broken".
 		with self.assertRaises(OSError):
 			checklist.load(Path(tempfile.gettempdir()) / "axygen-checklist-no-such-file.json")
+
+	def test_a_file_in_another_encoding_is_refused_rather_than_thrown(self):
+		# The same hand-edited-on-Windows file the byte order mark comes from
+		# can arrive in a legacy code page. Section 2 refuses a file at load
+		# precisely so that nothing throws later, with the focus in the
+		# application under test and NVDA suddenly silent.
+		directory = tempfile.mkdtemp()
+		self.addCleanup(shutil.rmtree, directory, True)
+		path = Path(directory) / "checklist.json"
+		path.write_bytes('{"checklist_name": "Тест", "sections": []}'.encode("cp1251"))
+		with self.assertRaises(checklist.ChecklistError) as refusal:
+			checklist.load(path)
+		self.assertEqual(refusal.exception.problem.kind, checklist.ProblemKind.NOT_JSON)
 
 	def test_a_broken_file_on_disk_is_refused_like_broken_text(self):
 		path = self.write(fixture_text("invalid", "unknown-status"))

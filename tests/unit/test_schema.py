@@ -34,14 +34,13 @@ would break at the next release of `jsonschema` without catching anything.
 import json
 import re
 import unittest
-from pathlib import Path
 from typing import Any, Iterator
 
 import jsonschema
 
-REPO_ROOT = Path(__file__).resolve().parents[2]
+from .support import REPO_ROOT, fixture_paths
+
 SCHEMA_PATH = REPO_ROOT / "docs" / "checklist-v1.schema.json"
-FIXTURES = REPO_ROOT / "tests" / "fixtures"
 SAMPLES = REPO_ROOT / "samples"
 DOCUMENTS = (
 	REPO_ROOT / "docs" / "requirements.md",
@@ -121,12 +120,6 @@ def contract_errors(document: Any) -> list[str]:
 	return errors
 
 
-def load_fixtures(kind: str) -> list[Path]:
-	paths = sorted((FIXTURES / kind).glob("*.json"))
-	assert paths, f"no fixtures under {kind}"
-	return paths
-
-
 class TestSchema(unittest.TestCase):
 	def test_schema_is_a_valid_2020_12_schema(self):
 		jsonschema.Draft202012Validator.check_schema(SCHEMA)
@@ -142,13 +135,13 @@ class TestSchema(unittest.TestCase):
 
 class TestFixtures(unittest.TestCase):
 	def test_valid_fixtures_are_accepted(self):
-		for path in load_fixtures("valid"):
+		for path in fixture_paths("valid"):
 			with self.subTest(fixture=path.name):
 				document = json.loads(path.read_text(encoding="utf-8"))
 				self.assertEqual(contract_errors(document), [])
 
 	def test_invalid_fixtures_are_rejected(self):
-		for path in load_fixtures("invalid"):
+		for path in fixture_paths("invalid"):
 			with self.subTest(fixture=path.name):
 				document = json.loads(path.read_text(encoding="utf-8"))
 				self.assertNotEqual(contract_errors(document), [])

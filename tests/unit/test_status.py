@@ -9,8 +9,9 @@ Section 2 of `docs/requirements.md` keeps the statuses as one table for the
 whole add-on. The table crosses the core/shell boundary, and the cut runs
 between the identifier and the word: `"passed"` is an identifier, the same in
 the file and in the code whatever the interface language, and lives here;
-"passed"/"пройдено" is an interface string wrapped in `_()` and lives in the
-shell. See "Межа ядра й оболонки" in docs/development.md.
+the word a tester hears for it is an interface string wrapped in `_()` and
+lives in the shell. See the section on the core/shell boundary in
+docs/development.md.
 """
 
 import unittest
