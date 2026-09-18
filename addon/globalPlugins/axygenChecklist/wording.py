@@ -31,10 +31,13 @@ here there is only the one item, and its text matters more than the verdict on
 it.
 
 **Why a file was refused.** Section 2 wants one source of that text for the
-whole add-on: the short spoken form belongs here, beside the statuses, because
-it is said from wherever a checklist is opened — at start-up from `state.json`
-(section 2), by the file dialog and by the GUI (sections 3.2.2 and 5). The core
-names the breach and never words it; see `core/checklist.py`.
+whole add-on, and sends it to two places. The short spoken form goes wherever a
+checklist loaded without anyone asking — at start-up, from `state.json`. The
+concrete reason — which field, which item, which value — goes into a window
+whenever the tester picked the file themselves, by the file dialog (section
+3.2.2) or by `Browse...` in the GUI (section 5). Both are built here, out of
+the same `Problem`, because both are interface strings and the core names a
+breach without ever wording it; see `core/checklist.py`.
 
 **Why a change was refused.** Its opposite number, and here for the same
 reason: section 4 gives every command that changes data the one phrase, and by
@@ -47,6 +50,8 @@ and section 3.3 for one section, out of the single count in `core.progress`;
 the clause about failures is the same clause in both, so it is written once
 below and neither caller spells it out.
 """
+
+import json
 
 import addonHandler
 
@@ -149,6 +154,175 @@ def spoken_refusal(problem: Problem | None = None) -> str:
 	# Translators: Spoken when a checklist file cannot be read, or holds something
 	# that is not a valid checklist.
 	return _("Error reading the file")
+
+
+def shown_refusal(problem: Problem | None = None) -> str:
+	"""Why a file the tester picked themselves would not load (sections 2 and 4).
+
+	The long form of `spoken_refusal`, and the one section 2 asks to name **which
+	field, which item, which value**. It is shown in a window rather than spoken
+	because the person who has just pressed "Open" is waiting for an answer and
+	is entitled to know what is wrong; four words would send them away with
+	nothing to go and fix.
+
+	Two lines where there is a place to name: where in the file the breach is,
+	and then what it is. The place counts sections and items from one, the way
+	someone reading the JSON counts them, and names the `id` as well when the
+	item has a usable one — that is the thing they will actually search the file
+	for (section 2).
+
+	`problem` is None when the file could not be opened at all. Nothing can be
+	named then — not the field, not the value, and not the reason the file
+	system had — so what is shown is the same short sentence the voice would
+	have used.
+	"""
+	if problem is None:
+		return spoken_refusal()
+	place = _place(problem)
+	breach = _breach(problem)
+	return f"{place}\n{breach}" if place else breach
+
+
+def _place(problem: Problem) -> str:
+	"""Where in the file the breach is, or nothing when it is the file itself.
+
+	Counted from one rather than from zero: these numbers exist to be matched
+	against a file being read by a person, and a person counting the items of
+	an array starts at the first one.
+	"""
+	if problem.section_index is None:
+		return ""
+	if problem.item_index is None:
+		# Translators: Shown above the reason a checklist file was refused, naming where in
+		# the file the problem is. {section} counts the sections of the file from one.
+		return _("Section {section}").format(section=problem.section_index + 1)
+	# Translators: Shown above the reason a checklist file was refused, naming where in the
+	# file the problem is. {section} and {item} count the sections of the file, and the items
+	# of that section, from one.
+	place = _("Section {section}, item {item}").format(
+		section=problem.section_index + 1,
+		item=problem.item_index + 1,
+	)
+	if problem.item_id is None:
+		return place
+	# Translators: Added to the place a problem in a checklist file was found at, when the
+	# item there carries a usable id. {id} is the value of the item's "id" field, which is
+	# what the author of the file would search for.
+	return place + _(", id {id}").format(id=problem.item_id)
+
+
+def _breach(problem: Problem) -> str:
+	"""What the validation contract of section 2 has against the file.
+
+	One sentence per kind, and every kind answered here rather than through a
+	default: a `match` with no catch-all is what makes the type check report a
+	kind that has been added to the core and forgotten in this table. The words
+	the tester reads are the only place the reason exists, so a kind arriving
+	here nameless would refuse the file and say nothing about it.
+	"""
+	field = problem.field
+	value = _value(problem.value)
+	match problem.kind:
+		case ProblemKind.FUTURE_FORMAT:
+			# The one breach with a sentence of its own, and the same one the voice
+			# says (section 2). There is no concrete reason to give: the file was
+			# written to rules this add-on does not know, so the field and the value
+			# are all there is, and "update the add-on" is the whole of the answer.
+			return spoken_refusal(problem)
+		case ProblemKind.NOT_JSON:
+			# A file in some other encoding arrives here too: section 2 puts it
+			# under the same answer, because which encoding the author had in mind
+			# is not something the add-on can say.
+			# Translators: Shown when a checklist file the tester picked cannot be parsed.
+			return _("The file is not valid JSON.")
+		case ProblemKind.NOT_AN_OBJECT:
+			return _not_an_object(problem)
+		case ProblemKind.MISSING_FIELD:
+			# Translators: Shown when a checklist file the tester picked leaves out a field
+			# the format requires. {field} is the name of that field, as it is spelled in the
+			# file.
+			return _('The required field "{field}" is missing.').format(field=field)
+		case ProblemKind.NOT_A_STRING:
+			# Translators: Shown when a field of a checklist file the tester picked holds the
+			# wrong kind of value. {field} is the name of the field and {value} is what stands
+			# there, written the way the file spells it.
+			return _('The field "{field}" must be text, but holds {value}.').format(
+				field=field,
+				value=value,
+			)
+		case ProblemKind.NOT_AN_INTEGER:
+			# Translators: Shown when a field of a checklist file the tester picked holds the
+			# wrong kind of value. {field} is the name of the field and {value} is what stands
+			# there, written the way the file spells it.
+			return _('The field "{field}" must be a whole number, but holds {value}.').format(
+				field=field,
+				value=value,
+			)
+		case ProblemKind.NOT_AN_ARRAY:
+			# Translators: Shown when a field of a checklist file the tester picked holds the
+			# wrong kind of value. {field} is the name of the field and {value} is what stands
+			# there, written the way the file spells it.
+			return _('The field "{field}" must be a list, but holds {value}.').format(
+				field=field,
+				value=value,
+			)
+		case ProblemKind.NO_SECTIONS:
+			# Translators: Shown when a checklist file the tester picked holds no sections at
+			# all. Flat checklists without sections are not supported.
+			return _('The field "sections" is empty; a checklist needs at least one section.')
+		case ProblemKind.DUPLICATE_ID:
+			# Translators: Shown when two items of a checklist file the tester picked carry
+			# the same id, which has to be unique within the file. {value} is that id.
+			return _("The id {value} belongs to more than one item.").format(value=value)
+		case ProblemKind.UNKNOWN_STATUS:
+			return _(
+				# Translators: Shown when an item of a checklist file the tester picked carries a
+				# status outside the five the format allows. {value} is what stands there, written
+				# the way the file spells it.
+				'The field "status" holds {value}, which is not one of '
+				'"pending", "passed", "failed", "blocked" and "skipped".',
+			).format(value=value)
+		case ProblemKind.UNKNOWN_FORMAT:
+			return _(
+				# Translators: Shown when a checklist file the tester picked declares a format
+				# version this add-on does not know and which is not a later one either, so there
+				# is no update to send anyone to. {value} is the version the file declares.
+				'The field "format_version" holds {value}, which is not a version of this format.',
+			).format(
+				value=value,
+			)
+
+
+def _not_an_object(problem: Problem) -> str:
+	"""The one breach that has to name what it was looking at.
+
+	Every other sentence names a field and stands on its own; this one says
+	only that something is of the wrong shape, so the thing is named here rather
+	than left to the line above — which is absent altogether when the breach is
+	the file itself.
+	"""
+	if problem.section_index is None:
+		# Translators: Shown when a checklist file the tester picked does not hold a JSON
+		# object at its top level, so there is no checklist in it at all.
+		return _("The file does not hold a checklist.")
+	if problem.item_index is None:
+		# Translators: Shown when an entry of the "sections" list of a checklist file is not
+		# a section at all, but a number, a piece of text or a list.
+		return _("This section is not written as a section.")
+	# Translators: Shown when an entry of the "items" list of a checklist file is not an item
+	# at all, but a number, a piece of text or a list.
+	return _("This item is not written as an item.")
+
+
+def _value(value: object) -> str:
+	"""What stands in the file, written the way the file spells it.
+
+	JSON rather than Python: the tester is going to open the file and look for
+	this, and `true` and `True` are not the same string to search for. Anything
+	that reaches here was parsed out of JSON in the first place, so there is
+	nothing here that cannot be written back as JSON.
+	"""
+	return json.dumps(value, ensure_ascii=False)
 
 
 def spoken_write_failure() -> str:

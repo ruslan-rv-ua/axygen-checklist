@@ -19,8 +19,8 @@ msgstr ""
 
 # The product name is deliberately left in English in every locale: it is the name the
 # add-on carries in the Add-on Store, in the configuration directory and in its documentation.
-#. Translators: The title of the add-on's confirmation dialogs: the product name,
-#. which is not translated in any locale.
+#. Translators: The title of the add-on's windows: the product name, which is
+#. not translated in any locale.
 #. Translators: The name of the category this add-on's commands appear under
 #. in NVDA's Input Gestures dialog.
 #. Add-on summary/title, usually the user visible name of the add-on
@@ -28,6 +28,21 @@ msgstr ""
 #. to be shown on installation and add-on information found in add-on store
 msgid "Axygen Checklist"
 msgstr "Axygen Checklist"
+
+#. Translators: The title of the dialog that picks a checklist file to open.
+msgid "Open a checklist"
+msgstr "Відкрити чекліст"
+
+#. Translators: The kind of file the Open dialog offers, shown in its file type
+#. filter. The pattern "(*.json)" is added after it.
+msgid "Checklist files"
+msgstr "Файли чеклістів"
+
+#. Translators: The second entry of the Open dialog's file type filter, which
+#. shows every file rather than only checklists. The pattern "(*.*)" is added
+#. after it.
+msgid "All files"
+msgstr "Усі файли"
 
 #. Translators: The status of a checklist item that has been checked and works.
 msgid "passed"
@@ -64,6 +79,108 @@ msgstr "Файл створено новішою версією додатка"
 #. that is not a valid checklist.
 msgid "Error reading the file"
 msgstr "Помилка читання файлу"
+
+#. Translators: Shown above the reason a checklist file was refused, naming where in
+#. the file the problem is. {section} counts the sections of the file from one.
+#, python-brace-format
+msgid "Section {section}"
+msgstr "Розділ {section}"
+
+#. Translators: Shown above the reason a checklist file was refused, naming where in the
+#. file the problem is. {section} and {item} count the sections of the file, and the items
+#. of that section, from one.
+#, python-brace-format
+msgid "Section {section}, item {item}"
+msgstr "Розділ {section}, пункт {item}"
+
+#. Translators: Added to the place a problem in a checklist file was found at, when the
+#. item there carries a usable id. {id} is the value of the item's "id" field, which is
+#. what the author of the file would search for.
+#, python-brace-format
+msgid ", id {id}"
+msgstr ", id {id}"
+
+#. A file in some other encoding arrives here too: section 2 puts it
+#. under the same answer, because which encoding the author had in mind
+#. is not something the add-on can say.
+#. Translators: Shown when a checklist file the tester picked cannot be parsed.
+msgid "The file is not valid JSON."
+msgstr "Файл не є коректним JSON."
+
+#. Translators: Shown when a checklist file the tester picked leaves out a field
+#. the format requires. {field} is the name of that field, as it is spelled in the
+#. file.
+#, python-brace-format
+msgid "The required field \"{field}\" is missing."
+msgstr "Обов'язкове поле «{field}» відсутнє."
+
+#. Translators: Shown when a field of a checklist file the tester picked holds the
+#. wrong kind of value. {field} is the name of the field and {value} is what stands
+#. there, written the way the file spells it.
+#, python-brace-format
+msgid "The field \"{field}\" must be text, but holds {value}."
+msgstr "Поле «{field}» має бути текстом, а містить {value}."
+
+#. Translators: Shown when a field of a checklist file the tester picked holds the
+#. wrong kind of value. {field} is the name of the field and {value} is what stands
+#. there, written the way the file spells it.
+#, python-brace-format
+msgid "The field \"{field}\" must be a whole number, but holds {value}."
+msgstr "Поле «{field}» має бути цілим числом, а містить {value}."
+
+#. Translators: Shown when a field of a checklist file the tester picked holds the
+#. wrong kind of value. {field} is the name of the field and {value} is what stands
+#. there, written the way the file spells it.
+#, python-brace-format
+msgid "The field \"{field}\" must be a list, but holds {value}."
+msgstr "Поле «{field}» має бути списком, а містить {value}."
+
+#. Translators: Shown when a checklist file the tester picked holds no sections at
+#. all. Flat checklists without sections are not supported.
+msgid ""
+"The field \"sections\" is empty; a checklist needs at least one section."
+msgstr "Поле «sections» порожнє: чекліст потребує щонайменше одного розділу."
+
+#. Translators: Shown when two items of a checklist file the tester picked carry
+#. the same id, which has to be unique within the file. {value} is that id.
+#, python-brace-format
+msgid "The id {value} belongs to more than one item."
+msgstr "Ідентифікатор {value} належить більш ніж одному пункту."
+
+#. Translators: Shown when an item of a checklist file the tester picked carries a
+#. status outside the five the format allows. {value} is what stands there, written
+#. the way the file spells it.
+#, python-brace-format
+msgid ""
+"The field \"status\" holds {value}, which is not one of \"pending\", "
+"\"passed\", \"failed\", \"blocked\" and \"skipped\"."
+msgstr ""
+"Поле «status» містить {value} — значення, якого немає серед «pending», "
+"«passed», «failed», «blocked» і «skipped»."
+
+#. Translators: Shown when a checklist file the tester picked declares a format
+#. version this add-on does not know and which is not a later one either, so there
+#. is no update to send anyone to. {value} is the version the file declares.
+#, python-brace-format
+msgid ""
+"The field \"format_version\" holds {value}, which is not a version of this "
+"format."
+msgstr "Поле «format_version» містить {value} — це не версія цього формату."
+
+#. Translators: Shown when a checklist file the tester picked does not hold a JSON
+#. object at its top level, so there is no checklist in it at all.
+msgid "The file does not hold a checklist."
+msgstr "Файл не містить чекліста."
+
+#. Translators: Shown when an entry of the "sections" list of a checklist file is not
+#. a section at all, but a number, a piece of text or a list.
+msgid "This section is not written as a section."
+msgstr "Цей розділ записано не як розділ."
+
+#. Translators: Shown when an entry of the "items" list of a checklist file is not an item
+#. at all, but a number, a piece of text or a list.
+msgid "This item is not written as an item."
+msgstr "Цей пункт записано не як пункт."
 
 #. Translators: Spoken when a change to the checklist could not be written to the
 #. file, so it is in memory but not on disk.
@@ -133,6 +250,10 @@ msgid "Arms the command mode of the checklist for three seconds"
 msgstr "Озброює режим команд чекліста на три секунди"
 
 #. Translators: The description of a command, as it appears in NVDA's Input Gestures dialog.
+msgid "Opens a checklist file"
+msgstr "Відкриває файл чекліста"
+
+#. Translators: The description of a command, as it appears in NVDA's Input Gestures dialog.
 msgid ""
 "Reads the name of the current section of the checklist and the progress "
 "through it"
@@ -193,78 +314,3 @@ msgstr ""
 #. Translators: what's new content for the add-on version to be shown in the add-on store
 msgid "First development version."
 msgstr "Перша версія в розробці."
-
-#~ msgid "Open a checklist"
-#~ msgstr "Відкрити чекліст"
-
-#~ msgid "Checklist files"
-#~ msgstr "Файли чеклістів"
-
-#~ msgid "All files"
-#~ msgstr "Усі файли"
-
-#, python-brace-format
-#~ msgid "Section {section}"
-#~ msgstr "Розділ {section}"
-
-#, python-brace-format
-#~ msgid "Section {section}, item {item}"
-#~ msgstr "Розділ {section}, пункт {item}"
-
-#, python-brace-format
-#~ msgid ", id {id}"
-#~ msgstr ", id {id}"
-
-#~ msgid "The file is not valid JSON."
-#~ msgstr "Файл не є коректним JSON."
-
-#, python-brace-format
-#~ msgid "The required field \"{field}\" is missing."
-#~ msgstr "Обов'язкове поле «{field}» відсутнє."
-
-#, python-brace-format
-#~ msgid "The field \"{field}\" must be text, but holds {value}."
-#~ msgstr "Поле «{field}» має бути текстом, а містить {value}."
-
-#, python-brace-format
-#~ msgid "The field \"{field}\" must be a whole number, but holds {value}."
-#~ msgstr "Поле «{field}» має бути цілим числом, а містить {value}."
-
-#, python-brace-format
-#~ msgid "The field \"{field}\" must be a list, but holds {value}."
-#~ msgstr "Поле «{field}» має бути списком, а містить {value}."
-
-#~ msgid ""
-#~ "The field \"sections\" is empty; a checklist needs at least one section."
-#~ msgstr ""
-#~ "Поле «sections» порожнє: чекліст потребує щонайменше одного розділу."
-
-#, python-brace-format
-#~ msgid "The id {value} belongs to more than one item."
-#~ msgstr "Ідентифікатор {value} належить більш ніж одному пункту."
-
-#, python-brace-format
-#~ msgid ""
-#~ "The field \"status\" holds {value}, which is not one of \"pending\", "
-#~ "\"passed\", \"failed\", \"blocked\" and \"skipped\"."
-#~ msgstr ""
-#~ "Поле «status» містить {value} — значення, якого немає серед «pending», "
-#~ "«passed», «failed», «blocked» і «skipped»."
-
-#, python-brace-format
-#~ msgid ""
-#~ "The field \"format_version\" holds {value}, which is not a version of "
-#~ "this format."
-#~ msgstr "Поле «format_version» містить {value} — це не версія цього формату."
-
-#~ msgid "The file does not hold a checklist."
-#~ msgstr "Файл не містить чекліста."
-
-#~ msgid "This section is not written as a section."
-#~ msgstr "Цей розділ записано не як розділ."
-
-#~ msgid "This item is not written as an item."
-#~ msgstr "Цей пункт записано не як пункт."
-
-#~ msgid "Opens a checklist file"
-#~ msgstr "Відкриває файл чекліста"

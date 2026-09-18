@@ -82,11 +82,16 @@ this properly, and there is no public way to: the flag is private, and the
 nearest public thing, whether the `wx` main loop is running, is a proxy and not
 the fact, since the loop is up before the first focus has been reported.
 
-Opening a checklist any other way — the file dialog of section 3.2.2, the GUI
-of section 5 — is still to come; until it arrives, the file named in
-`state.json` is the only one the add-on can have.
+**A checklist arrives two ways, and they are one operation.** Start-up reads
+the path out of `state.json`; the `O` key of the command mode asks the tester
+for one (section 3.2.2). What differs is where the path came from and what is
+said afterwards — nothing else, which is why `_adopt` holds the part in the
+middle. A start-up that finds its file gone does both in turn: it says so, and
+then opens the very dialog `O` would have (section 2). The GUI of section 5
+will be the third way in and the same operation again.
 """
 
+import dataclasses
 from collections.abc import Callable
 from pathlib import Path
 
@@ -147,9 +152,27 @@ _DIGIT_STATUSES = {
 #: the currency the whole construction is bought with.
 _MODE_KEYS = {
 	**{identifier: "setStatus" for identifier in _DIGIT_STATUSES},
+	"kb:o": "openChecklist",
 	"kb:p": "speakSectionProgress",
 	"kb:r": "resetSection",
 }
+
+
+@dataclasses.dataclass(frozen=True)
+class _RestoreFailure:
+	"""What a restore at start-up could not do, until there is anyone to hear it.
+
+	There is always something to say — section 4 gives every way a checklist can
+	fail to load its own short sentence — so the message is not optional, and a
+	restore that went well has no `_RestoreFailure` at all rather than an empty
+	one. Only one failure also owes a window: the file named in `state.json` is
+	no longer on the disk, so there is nothing to work with until another path
+	is given, and section 2 has the add-on ask for one. A file that is there and
+	broken is not that case and opens no window (section 4).
+	"""
+
+	message: str
+	choose_a_file: bool = False
 
 
 def _state_file() -> Path:
@@ -212,9 +235,9 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 		self._mode = commandmode.CommandMode(self, _MODE_KEYS)
 		#: Where the position between runs of NVDA is kept (section 2).
 		self._state = _state_file()
-		#: What the restore has to say, until there is anyone to hear it. None
+		#: What the restore could not do, until there is anyone to hear it. None
 		#: when it went well, which section 2 answers with silence.
-		self._startup_message = self._restore()
+		self._startup_failure = self._restore()
 		postNvdaStartup.register(self._announce_restore)
 		log.info("Axygen Checklist loaded")
 
@@ -235,14 +258,14 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 		postNvdaStartup.unregister(self._announce_restore)
 		super().terminate()
 
-	def _restore(self) -> str | None:
+	def _restore(self) -> _RestoreFailure | None:
 		"""Pick the run up where the last one left it, and say what stopped it.
 
 		Section 2: the path and the pair of indices come out of `state.json`,
 		and a restart of NVDA lands the tester back on the item they stopped
 		on. Nothing is said when that works — no command was given, and NVDA is
-		mid-sentence about itself at this moment anyway. What comes back is the
-		message a failure has earned, for `_announce_restore` to say later.
+		mid-sentence about itself at this moment anyway. What comes back is what
+		a failure has earned, for `_announce_restore` to make good on later.
 
 		**Nothing is written back here**, whether this went well or badly. A
 		restore reads the position rather than changing it, and section 2 has
@@ -259,35 +282,51 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 		try:
 			loaded = checklist.load(remembered.checklist)
 		except FileNotFoundError:
-			# Translators: Spoken when NVDA starts and the checklist that was open
-			# last time is no longer where it was.
-			return _("Checklist file not found")
+			return _RestoreFailure(
+				# Translators: Spoken when NVDA starts and the checklist that was open
+				# last time is no longer where it was.
+				_("Checklist file not found"),
+				choose_a_file=True,
+			)
 		except OSError:
 			# Everything else that stops a file being read at all: no permission,
 			# a drive that is not there, a name Windows will not open. Section 2
 			# gives them the same four words as a broken file, and the log is
 			# where the difference between them survives.
 			log.error(f"could not read the checklist at {remembered.checklist}", exc_info=True)
-			return wording.spoken_refusal()
+			return _RestoreFailure(wording.spoken_refusal())
 		except checklist.ChecklistError as refusal:
-			return wording.spoken_refusal(refusal.problem)
-		self._checklist = loaded
-		self._position = navigation.resume(loaded, remembered.position)
+			return _RestoreFailure(wording.spoken_refusal(refusal.problem))
+		self._adopt(loaded, remembered.position_in(remembered.checklist))
 		return None
 
 	def _announce_restore(self) -> None:
 		"""Say what the restore could not do, now that NVDA can be heard.
 
-		Section 4 allows the short spoken message and forbids a window here:
-		the tester is working in the application under test, and a dialog that
-		appeared by itself would take the focus with it. Section 2 sends them
-		on to the file dialog when the file has gone, which is the one part of
-		this still to be built.
+		Section 4 allows the short spoken message and forbids a window for a
+		file that is there and will not load: the tester is working in the
+		application under test, and a dialog that appeared by itself would take
+		the focus with it. A file that has **gone** is the other case, and
+		section 2 answers it with this warning and then the file dialog —
+		because there is nothing to work with at all until another path is
+		given, and that dialog is what the tester would open with their first
+		command anyway.
+
+		The warning is spoken before the window and may not survive it: NVDA
+		cancels speech when the foreground changes (section 6), and the file
+		dialog announcing itself is such a change. `ui.delayedMessage` would
+		only push the phrase further into the window's way. The order is the
+		one section 2 asks for, and how much of it is heard is down for a
+		listen on a real build.
 		"""
-		if self._startup_message is None:
+		failure = self._startup_failure
+		if failure is None:
 			return
-		ui.message(self._startup_message)
-		self._startup_message = None
+		# Cleared before anything is said, so that nothing here can be owed twice.
+		self._startup_failure = None
+		ui.message(failure.message)
+		if failure.choose_a_file:
+			self._choose_checklist()
 
 	@script(
 		description=_(
@@ -404,6 +443,27 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 	@script(
 		description=_(
 			# Translators: The description of a command, as it appears in NVDA's Input Gestures dialog.
+			"Opens a checklist file",
+		),
+	)
+	@blockAction.when(blockAction.Context.MODAL_DIALOG_OPEN)
+	def script_openChecklist(self, gesture: inputCore.InputGesture) -> None:
+		# The `O` key of the command mode, and the whole of it is "NVDA+Alt+O,
+		# release, O" (section 3.2.2). Held down, a second NVDA+Alt+O is the
+		# global command over again — the mode dropped and armed afresh — so the
+		# cheat sheet writes that line out in full. The cost of getting it wrong
+		# is a tone instead of a window, and nothing else.
+		#
+		# The one command of the add-on that asks for no checklist: this is how
+		# a checklist arrives. `_standing` is not called, and nothing here says
+		# "No checklist loaded" — that would put the only way in behind having
+		# already come in.
+		self._mode.disarm()
+		self._choose_checklist()
+
+	@script(
+		description=_(
+			# Translators: The description of a command, as it appears in NVDA's Input Gestures dialog.
 			"Reads the name of the current section of the checklist and the progress through it",
 		),
 	)
@@ -449,6 +509,120 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 			),
 			on_yes=lambda: self._reset_section(loaded, section),
 		)
+
+	def _choose_checklist(self) -> None:
+		"""Ask the tester which checklist to open (section 3.2.2).
+
+		The browsing starts in the folder of the last path in `state.json`,
+		which is lying there anyway (section 3.2.2), and the file is read off
+		the disk rather than off `self._checklist`: the two agree while one is
+		open, and the moment they do not is exactly the moment this is wanted —
+		start-up found the file gone, so there is no checklist in hand and the
+		only thing left pointing anywhere is that path (section 2).
+
+		What was remembered is read once, here, and carried to `_open` rather
+		than read again on the far side: nothing can have changed it in between,
+		because the add-on is the only writer of that file and its commands are
+		blocked while the dialog is open (section 3.3.1).
+
+		The answer arrives long after this has returned, in `_open`.
+		"""
+		remembered = session.load(self._state)
+		folder = remembered.checklist
+		modal.choose_file(
+			None if folder is None else folder.parent,
+			lambda path: self._open(path, remembered),
+		)
+
+	def _open(self, path: Path, remembered: Session) -> None:
+		"""Open the checklist the tester just picked, or show why it will not open.
+
+		The far side of the file dialog (section 3.2.2). A refusal goes into a
+		window here, and that is the whole difference from the same failure at
+		start-up: section 4 forbids a window for a file that loaded without
+		anyone asking, and requires the concrete reason — which field, which
+		item, which value — for one the tester chose themselves and is waiting
+		on. Both sentences are built from the same `Problem`, so neither path
+		has a wording of its own (section 2).
+
+		A file that could not be opened at all has no field, item or value to
+		name, and the window then shows the same short sentence the voice would
+		have used: which encoding the author had in mind, or what the file
+		system's objection was, is not something the add-on can say. It should
+		not happen — the dialog only offers files that exist — but a file can
+		be taken away or locked between the picking and the opening.
+
+		**A refusal leaves `state.json` alone** (section 2), which this gets by
+		writing nothing on the way out: the path in it is where the file dialog
+		starts browsing, and erasing it here would erase it exactly when it is
+		needed. The position and the checklist in hand stay as they were too —
+		a file that would not open has not replaced the one that did.
+
+		`remembered` is what that file said when the dialog was opened, read
+		once by `_choose_checklist` and carried here rather than read again.
+		"""
+		try:
+			loaded = checklist.load(path)
+		except OSError:
+			log.error(f"could not read the checklist at {path}", exc_info=True)
+			modal.report(wording.shown_refusal())
+			return
+		except checklist.ChecklistError as refusal:
+			modal.report(wording.shown_refusal(refusal.problem))
+			return
+		self._adopt(loaded, remembered.position_in(path))
+		# The path and the position reach the disk now, as after any other
+		# change of position (section 2), and a write that does not get there is
+		# a line in the log; `_remember` holds both halves of that rule.
+		self._remember()
+		self._speak_opened(loaded)
+
+	def _adopt(self, loaded: Checklist, remembered: Position | None) -> None:
+		"""Make `loaded` the checklist every command works on, standing where it was left.
+
+		The middle of both ways a checklist arrives — the restore at start-up
+		and the file dialog — which section 3.2.2 calls one operation differing
+		only in where the path came from.
+
+		`remembered` is what `state.json` held **for this file**, which is why
+		both callers ask for it by path: that file holds one pair of indices,
+		measured in whichever checklist was open when it was written, so the
+		same file reopened lands where the tester stopped while another starts
+		at its first item (section 3.2.2). What to do with a pair that no longer
+		names a place in the file it does belong to is `navigation.resume`'s,
+		and it answers with the first item as well.
+		"""
+		self._checklist = loaded
+		self._position = navigation.resume(loaded, remembered)
+
+	def _speak_opened(self, loaded: Checklist) -> None:
+		"""Say where the tester has landed in the checklist they just opened.
+
+		Section 3.2.2 speaks the item the way a jump between sections speaks it
+		(section 3.1) — the name of the section, then the text, the status and
+		the note. The name is there for the same reason it is there after a
+		jump, only more so: landing in a file that was not open a moment ago is
+		the most deliberate jump there is, and without the section the tester
+		would not know where they had arrived. The name of the checklist is not
+		spoken — they picked the file themselves, so "which file?" already has
+		an answer, while "where am I?" does not.
+
+		Silence is what a restore at start-up gets and what this may not have
+		(section 2): a command was given here, and a window that closed without
+		a word would sound exactly like one that was cancelled.
+
+		It goes out through `modal.message`, because the file dialog has just
+		handed the focus back and NVDA is about to announce the window that
+		took it — a phrase queued at once would be cut off by it (section 6).
+		"""
+		position = self._position
+		if position is None:
+			# A checklist of empty sections is valid (section 2), and there is
+			# nowhere in it to stand; the same sentence says so as when a command
+			# finds it, rather than a second one saying the same thing.
+			self._say_there_is_no_item(modal.message)
+			return
+		self._speak(loaded, position, name_the_section=True, say=modal.message)
 
 	def _navigate(self, direction: Direction) -> None:
 		"""Move one item, or — on the second press of the series — one section.
@@ -528,10 +702,23 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 			# Translators: Spoken when there is no section before this one to jump to.
 			ui.message(_("Start of list"))
 
-	def _speak(self, loaded: Checklist, position: Position, name_the_section: bool = False) -> None:
-		"""Say the item at `position`, the way sections 3.1 and 3.3 both say it."""
+	def _speak(
+		self,
+		loaded: Checklist,
+		position: Position,
+		name_the_section: bool = False,
+		say: Callable[[str], None] = ui.message,
+	) -> None:
+		"""Say the item at `position`, the way sections 3.1 and 3.3 both say it.
+
+		`say` is `ui.message` from a command that runs with the focus where the
+		tester left it, and `modal.message` from one that has just closed a
+		window, whose phrase would otherwise be cut off by the focus coming
+		back (section 6) — the same choice `_write` makes, and for the same
+		reason.
+		"""
 		section = navigation.section_at(loaded, position).name if name_the_section else None
-		ui.message(wording.spoken_item(navigation.item_at(loaded, position), section))
+		say(wording.spoken_item(navigation.item_at(loaded, position), section))
 
 	def _speak_progress(self) -> None:
 		"""Say which section the tester is in and how far it has got (section 3.3).
@@ -691,7 +878,7 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 			return None
 		return loaded, position
 
-	def _say_there_is_no_item(self) -> None:
+	def _say_there_is_no_item(self, say: Callable[[str], None] = ui.message) -> None:
 		"""Section 4: why a command found nothing to work on, worded in one place.
 
 		Two states reach here and they are not the same one. Nothing has been
@@ -703,11 +890,15 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 		thing the tester can check at that moment — whether they opened the
 		file they meant to. What to do about them differs too: pick a file, or
 		write some items into the one already picked.
+
+		`say` is how it reaches them, as in `_speak` and `_write`: the second
+		state is also what a checklist just opened by the file dialog can turn
+		out to be, and a window has closed by then.
 		"""
 		if self._checklist is None:
 			# Translators: Spoken when a command is used before a checklist has been opened.
-			ui.message(_("No checklist loaded"))
+			say(_("No checklist loaded"))
 			return
 		# Translators: Spoken when a command is used on a checklist whose sections
 		# are all empty, so there is no item to stand on.
-		ui.message(_("The checklist has no items"))
+		say(_("The checklist has no items"))

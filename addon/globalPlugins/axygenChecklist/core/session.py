@@ -55,6 +55,25 @@ class Session:
 	checklist: Path | None = None
 	position: Position | None = None
 
+	def position_in(self, checklist: Path) -> Position | None:
+		"""Where the tester stood in the checklist at `checklist`, or None.
+
+		Opening a file and restoring one at start-up are the same operation,
+		differing only in where the path came from (section 3.2.2), and this is
+		the one place where that difference shows: the path the file dialog
+		hands over may name any file on the disk, while the indices held here
+		were measured in whichever file was open when they were written. So
+		they are asked for **by path**, and another file gets None — indices
+		into a structure nobody opened describe nothing, and section 3.2.2
+		starts such a file at its first item.
+
+		Whether the indices still name a real place in the file they belong to
+		is a different question, and `navigation.resume` answers it.
+		"""
+		if self.checklist != checklist:
+			return None
+		return self.position
+
 
 def load(path: Path) -> Session:
 	"""Read the session stored at `path`, or an empty one if it cannot be read.

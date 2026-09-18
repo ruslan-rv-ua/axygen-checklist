@@ -53,15 +53,19 @@ and the caller of `show` should not have to remember that; NVDA's own
 is a no-op.
 
 What a window says and which buttons it has is the business of the window. The
-confirmation built at the bottom is the one shape two commands share — resetting
-a section (section 3.2.2) and resetting the run (section 5) — so it is built
-once, on NVDA's own `MessageDialog`. Its Yes and No are labelled by NVDA's own
-catalogue rather than ours, which is the same move as the copy confirmation of
-section 3.2.2: the tester hears the same words as from every other question the
-screen reader asks.
+three built at the bottom are the shapes more than one command shares, so each
+is built once: the confirmation, asked before a section is reset (section 3.2.2)
+and before the run is (section 5); the file dialog, opened by the `O` key and by
+a start-up that found its checklist gone (sections 3.2.2 and 2); and the error,
+shown for a file the tester picked themselves, whether by `O` or by `Browse...`
+in the GUI (sections 3.2.2 and 5). The first two are NVDA's own `MessageDialog`,
+and their buttons are labelled from NVDA's catalogue rather than ours — the same
+move as the copy confirmation of section 3.2.2: the tester hears the words every
+other question of the screen reader uses.
 """
 
 from collections.abc import Callable
+from pathlib import Path
 from typing import TypeVar
 
 import addonHandler
@@ -79,7 +83,39 @@ addonHandler.initTranslation()
 DialogT = TypeVar("DialogT", bound=wx.Dialog)
 
 
-def show(create: Callable[[wx.Window], DialogT], then: Callable[[DialogT, int], None]) -> None:
+def _title() -> str:
+	"""The title every window of the add-on carries: the product name (section 6).
+
+	The tester is working in someone else's window, and the title is what says
+	who is asking. It is not translated in any locale — it is the name the
+	add-on goes by in the Add-on Store, in the configuration directory and in
+	its documentation — and the entry in the Ukrainian catalogue deliberately
+	repeats the original.
+
+	Looked up on each call rather than held in a constant, so that the words
+	follow the interface language NVDA is running now rather than whatever it
+	was when this module was imported. That matters for the catalogue rather
+	than for this string, which is the same in both, but the rule is the one
+	`wording.status_word` follows and there is no reason for a second.
+	"""
+	# Translators: The title of the add-on's windows: the product name, which is
+	# not translated in any locale.
+	return _("Axygen Checklist")
+
+
+def _nothing(dialog: wx.Dialog, answer: int) -> None:
+	"""The answer of a window that has none: the default `then` of `show`.
+
+	A window with one button says only that it was read, and there is nothing
+	to do with that. Spelling it once here beats a do-nothing callback written
+	out at each such call.
+	"""
+
+
+def show(
+	create: Callable[[wx.Window], DialogT],
+	then: Callable[[DialogT, int], None] = _nothing,
+) -> None:
 	"""Show the window `create` builds, once the script asking has returned.
 
 	`create` is handed the parent every window of the add-on must have and
@@ -89,6 +125,10 @@ def show(create: Callable[[wx.Window], DialogT], then: Callable[[DialogT, int], 
 	what the tester put in it. Whatever `then` does with the answer, the
 	focus is already on its way back to where it was, and anything it wants
 	said goes through `message`.
+
+	A `then` that opens a window of its own is safe: this one has closed and
+	been destroyed by the time the next is built, because `show` schedules
+	rather than shows. That is the path from the file dialog to the error.
 	"""
 	wx.CallAfter(_show, create, then)
 	scriptHandler.clearLastScript()
@@ -149,9 +189,7 @@ def confirm(question: str, on_yes: Callable[[], None]) -> None:
 		dialog = MessageDialog(
 			parent,
 			question,
-			# Translators: The title of the add-on's confirmation dialogs: the product name,
-			# which is not translated in any locale.
-			_("Axygen Checklist"),
+			_title(),
 			DialogType.WARNING,
 			buttons=DefaultButtonSet.YES_NO,
 		)
@@ -162,3 +200,80 @@ def confirm(question: str, on_yes: Callable[[], None]) -> None:
 			on_yes()
 
 	show(create, answered)
+
+
+def choose_file(folder: Path | None, then: Callable[[Path], None]) -> None:
+	"""Ask which checklist to open, and hand the file the tester picked to `then`.
+
+	The standard file dialog of section 3.2.2, opened by the `O` key of the
+	command mode and by a start-up that found the file named in `state.json`
+	gone (section 2). It is a file dialog and not the GUI window on purpose:
+	`O` answers "which checklist?", one action, while the window with the tree
+	and the panels answers everything else.
+
+	`folder` is where the browsing starts — the folder of the last path in
+	`state.json`, which is lying there anyway (section 3.2.2) — and None when
+	nothing has ever been opened, which leaves the choice to Windows.
+
+	A cancelled dialog calls nothing and says nothing, the same silence as "No"
+	above. The window is native rather than one of NVDA's, and nothing about
+	the rest changes for that: `displayDialogAsModal` raises the modality
+	counter before it looks at what it was given, so the commands of the add-on
+	stay blocked behind this one too (section 6).
+	"""
+
+	def create(parent: wx.Window) -> wx.FileDialog:
+		return wx.FileDialog(
+			parent,
+			# Translators: The title of the dialog that picks a checklist file to open.
+			message=_("Open a checklist"),
+			defaultDir="" if folder is None else str(folder),
+			# Two entries, and the second one matters (section 3.2.2). Narrowing
+			# to `*.json` is worth having: a checklist usually sits in the
+			# repository of the product under test, and a tester reading the list
+			# by ear should not have to walk past the source files to reach it.
+			# But `.json` is only the usual name — section 2 gives it as an
+			# example and never as a rule — so "All files" stays, or a checklist
+			# saved under any other extension could not be picked at all.
+			wildcard="{checklists} (*.json)|*.json|{everything} (*.*)|*.*".format(
+				# Translators: The kind of file the Open dialog offers, shown in its file type
+				# filter. The pattern "(*.json)" is added after it.
+				checklists=_("Checklist files"),
+				# Translators: The second entry of the Open dialog's file type filter, which
+				# shows every file rather than only checklists. The pattern "(*.*)" is added
+				# after it.
+				everything=_("All files"),
+			),
+			style=wx.FD_OPEN | wx.FD_FILE_MUST_EXIST,
+		)
+
+	def chosen(dialog: wx.FileDialog, answer: int) -> None:
+		if answer == wx.ID_OK:
+			then(Path(dialog.GetPath()))
+
+	show(create, chosen)
+
+
+def report(text: str) -> None:
+	"""Show `text` as the error it is, and say nothing out loud.
+
+	Why a file the tester picked themselves would not load (sections 2, 3.2.2
+	and 5): which field, which item, which value. It is a window because the
+	person pressed "Open" and is waiting for an answer, which is the very case
+	section 4 separates from a file that loaded without anyone asking — that
+	one gets four words spoken and no window at all.
+
+	An error, so the icon and the sound are the ones NVDA gives one. Escape
+	closes it without any help from us — a `MessageDialog` falls back to its
+	affirmative button when it has no cancel, and OK is the only button here.
+	"""
+
+	def create(parent: wx.Window) -> MessageDialog:
+		return MessageDialog(
+			parent,
+			text,
+			_title(),
+			DialogType.ERROR,
+		)
+
+	show(create)

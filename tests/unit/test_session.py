@@ -207,3 +207,43 @@ class TestADamagedPosition(OnDisk):
 	def test_an_index_that_is_null_keeps_the_path(self):
 		self.written('{"checklist": "somewhere/checklist.json", "section": null, "item": null}')
 		self.assertEqual(session.load(self.path), self.path_only())
+
+
+class TestThePositionBelongsToOneFile(unittest.TestCase):
+	"""Whose place the remembered indices are (sections 2 and 3.2.2).
+
+	The file dialog may be pointed at any file on the disk, while `state.json`
+	holds one position and it was measured in whichever file was open when it
+	was written. Asking for it by path is what keeps the two apart: the same
+	file reopened lands where the tester stopped, another file starts at the
+	top, because indices into a structure nobody opened describe nothing.
+	"""
+
+	def remembered(self) -> Session:
+		return Session(Path("C:/checklists/forms.json"), Position(1, 4))
+
+	def test_the_same_file_gets_the_position_back(self):
+		self.assertEqual(
+			self.remembered().position_in(Path("C:/checklists/forms.json")),
+			Position(1, 4),
+		)
+
+	def test_another_file_gets_no_position(self):
+		self.assertIsNone(self.remembered().position_in(Path("C:/checklists/menus.json")))
+
+	def test_the_same_file_spelled_another_way_gets_the_position_back(self):
+		# The add-on writes what the file dialog handed it and reads it back as
+		# text, so the same file can arrive spelled two ways. Windows tells
+		# neither the case nor the separator apart, and `Path` compares the two
+		# the way the platform does.
+		self.assertEqual(
+			self.remembered().position_in(Path(r"c:\Checklists\FORMS.json")),
+			Position(1, 4),
+		)
+
+	def test_a_file_remembered_without_a_position_gets_none(self):
+		nowhere = Session(Path("C:/checklists/forms.json"))
+		self.assertIsNone(nowhere.position_in(Path("C:/checklists/forms.json")))
+
+	def test_nothing_remembered_at_all_gets_no_position(self):
+		self.assertIsNone(Session().position_in(Path("C:/checklists/forms.json")))
