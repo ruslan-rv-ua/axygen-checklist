@@ -33,11 +33,12 @@ This page describes the add-on as a whole, and not all of it is built yet.
 Walking a checklist works: a file opens, the commands move through it, an item
 takes a status and the run moves on to the next one by itself, the item dialog
 shows it in full and takes a comment, a fragment of an item goes to the
-clipboard, and the run says so when nothing is left unchecked. What is missing
-sits around that core.
+clipboard, and the run says so when nothing is left unchecked. The window opens
+too, on the tree of the whole checklist and the comment of whatever is selected
+in it. What is missing sits around that core.
 
-* **The GUI window**: the tree of the whole checklist, the comment of the
-  selected item, and the button that resets the lot. Due in 0.1.0.
+* **The rest of the window**: choosing a file in it, the auto-advance checkbox,
+  and the button that resets the lot. Due in 0.1.0.
 * **Filtering to unchecked items** — due in 0.2.0.
 
 Until 1.0.0 the checklist file format and the set of commands may still change

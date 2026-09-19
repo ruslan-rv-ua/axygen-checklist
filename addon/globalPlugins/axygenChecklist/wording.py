@@ -19,6 +19,11 @@ core and the shell, and the cut runs between the identifier and the word: the
 identifiers are in `core.status`, and what a tester hears for them is an
 interface string wrapped in `_()` and belongs here.
 
+It has the two columns section 2 draws it with, and they travel as one row
+(`_status_words`). One table is what that section asks for in as many words,
+and a row is what makes the asking mechanical: a sixth status is one place to
+add it rather than two, of which one would eventually be missed.
+
 **What a tester hears about one item.** Sections 3.1 and 3.3 both speak an item
 — on landing on it after a move, and on being asked to say it again — and
 section 3.1 says outright that the two are the same. So the sentence is built
@@ -29,6 +34,12 @@ GUI tree, where the status stands in front of the text (section 5). A tree is
 scanned down the page and the prefix filters it by ear from the first syllable;
 here there is only the one item, and its text matters more than the verdict on
 it.
+
+**What a tester reads about one item.** The other half of that sentence: the
+label an item carries in the tree of the GUI window, which is the same two
+things in the other order. It is built here for the reason the spoken form is —
+the status half of it is the dictionary above, and a label assembled in the
+window would be a second wording of the same five words.
 
 **What a save altered.** Section 3.3.1 speaks only what really moved, in the
 order status → comment, and the status half of that is the dictionary above —
@@ -58,6 +69,7 @@ below and neither caller spells it out.
 """
 
 import json
+from typing import NamedTuple
 
 import addonHandler
 
@@ -68,31 +80,112 @@ from .core.progress import Progress
 addonHandler.initTranslation()
 
 
+class _StatusWords(NamedTuple):
+	"""Both columns the status table of section 2 gives one status.
+
+	A row carrying the pair, rather than a table per column: section 2 asks for
+	**one** table in the code, and one is what a sixth status then has to be
+	added to. Two mappings keyed on the same identifiers would be two places to
+	forget, and the one that was forgotten would be found by a tester hearing a
+	`KeyError`-shaped silence.
+	"""
+
+	#: What a tester hears for the status: spoken on a change (section 4) and on
+	#: request (section 3.3), and shown in the combo box of the item dialog.
+	word: str
+	#: What stands in front of the text of an item in the tree of the GUI window
+	#: (section 5), the separator included.
+	prefix: str
+
+
 def status_word(value: str) -> str:
 	"""The word a tester hears for the status `value`.
 
 	`value` is one of `core.status.STATUSES`; the validation contract of
 	section 2 admits nothing else into a checklist, and the combo box of the
 	item dialog is read-only so that nothing else can be written back.
+	"""
+	return _status_words(value).word
+
+
+def tree_label(item: Item) -> str:
+	"""The label `item` carries as a node of the tree in the GUI window (section 5).
+
+	The status in front of the text, and the text as the file spells it — the
+	fragments of section 2 keep their delimiters here as everywhere the text is
+	shown. The comment is not in it: section 5 keeps the labels short, and a
+	paragraph in one would undo that, which is what the panel under the tree is
+	for.
+
+	The order is the reverse of the sentence spoken about an item (`spoken_item`),
+	and section 3.3 says why: a tree is scanned down the page, and a prefix
+	filters it by ear from the first syllable, whereas a single item spoken on
+	its own is its text before anything else.
+
+	`pending` contributes nothing, deliberately (section 2). It is the commonest
+	state by far, and a word in front of every one of several dozen items would
+	cost the tester more than it told them; the absence of a prefix is itself
+	what "not checked" looks like in a tree.
+	"""
+	return _status_words(item.status).prefix + item.text
+
+
+def _status_words(value: str) -> _StatusWords:
+	"""The row the status table of section 2 gives `value` — both columns at once.
+
+	The one table the whole add-on speaks statuses from, and the shape is the
+	specification's own: two columns, not a word and a rule for making the other
+	one out of it. Deriving the prefix — capitalise the word, add a colon —
+	would hard-code punctuation the catalogue is entitled to choose, and would
+	leave a locale that wanted an abbreviation in the tree where the voice says
+	a whole word with nowhere to say so.
 
 	The table is built on each call rather than once at import, so that the
-	words follow the interface language of NVDA rather than whatever it was
-	when the plugin was loaded.
+	words follow the interface language NVDA is running now rather than whatever
+	it was when the plugin was loaded.
 	"""
-	words = {
-		# Translators: The status of a checklist item that has been checked and works.
-		status.PASSED: _("passed"),
-		# Translators: The status of a checklist item that has been checked and does not work.
-		status.FAILED: _("failed"),
-		# Translators: The status of a checklist item that could not be checked because
-		# something else is in the way.
-		status.BLOCKED: _("blocked"),
-		# Translators: The status of a checklist item that was deliberately left unchecked.
-		status.SKIPPED: _("skipped"),
-		# Translators: The status of a checklist item that has not been checked yet.
-		status.PENDING: _("not checked"),
-	}
-	return words[value]
+	return {
+		status.PASSED: _StatusWords(
+			# Translators: The status of a checklist item that has been checked and works.
+			word=_("passed"),
+			# Translators: Stands in front of the text of a checklist item in the tree of the
+			# add-on's window, when the item has been checked and works. The colon and the space
+			# are part of it.
+			prefix=_("Passed: "),
+		),
+		status.FAILED: _StatusWords(
+			# Translators: The status of a checklist item that has been checked and does not work.
+			word=_("failed"),
+			# Translators: Stands in front of the text of a checklist item in the tree of the
+			# add-on's window, when the item has been checked and does not work. The colon and
+			# the space are part of it.
+			prefix=_("Failed: "),
+		),
+		status.BLOCKED: _StatusWords(
+			# Translators: The status of a checklist item that could not be checked because
+			# something else is in the way.
+			word=_("blocked"),
+			# Translators: Stands in front of the text of a checklist item in the tree of the
+			# add-on's window, when the item could not be checked because something else is in
+			# the way. The colon and the space are part of it.
+			prefix=_("Blocked: "),
+		),
+		status.SKIPPED: _StatusWords(
+			# Translators: The status of a checklist item that was deliberately left unchecked.
+			word=_("skipped"),
+			# Translators: Stands in front of the text of a checklist item in the tree of the
+			# add-on's window, when the item was deliberately left unchecked. The colon and the
+			# space are part of it.
+			prefix=_("Skipped: "),
+		),
+		status.PENDING: _StatusWords(
+			# Translators: The status of a checklist item that has not been checked yet.
+			word=_("not checked"),
+			# No prefix at all, which is the whole of what the tree says about an item
+			# nobody has looked at yet; `tree_label` carries the reason.
+			prefix="",
+		),
+	}[value]
 
 
 def spoken_item(item: Item, section_name: str | None = None) -> str:

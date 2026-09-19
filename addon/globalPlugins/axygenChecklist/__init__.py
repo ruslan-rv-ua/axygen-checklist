@@ -82,6 +82,15 @@ this properly, and there is no public way to: the flag is private, and the
 nearest public thing, whether the `wx` main loop is running, is a proxy and not
 the fact, since the loop is up before the first focus has been reported.
 
+**The window of section 5 has two ways in, and one of them is not a gesture.**
+The `G` key of the command mode is a script like any other; the entry in NVDA's
+Tools menu is a `wx` menu item, which belongs to the screen reader's own GUI
+rather than to this object and therefore has to be taken back out of it when
+NVDA is done with the plugin. Both ways end in the same call. The window itself
+is `guiwindow`'s, and it is the one window of the add-on that is not modal — so
+unlike the four that are, every command here goes on working while it stands
+(section 3.3.1).
+
 **A checklist arrives two ways, and they are one operation.** Start-up reads
 the path out of `state.json`; the `O` key of the command mode asks the tester
 for one (section 3.2.2). What differs is where the path came from and what is
@@ -98,10 +107,12 @@ from pathlib import Path
 import addonHandler
 import api
 import globalPluginHandler
+import gui
 import inputCore
 import NVDAState
 import scriptHandler
 import ui
+import wx
 
 # NVDA's own `core`, which shares a name with the add-on's `core` package
 # below. The two never collide — one is imported absolutely and the other
@@ -112,7 +123,16 @@ from gui import blockAction
 from logHandler import log
 from scriptHandler import script
 
-from . import commandmode, fragmentsdialog, itemdialog, modal, preferences, signals, wording
+from . import (
+	commandmode,
+	fragmentsdialog,
+	guiwindow,
+	itemdialog,
+	modal,
+	preferences,
+	signals,
+	wording,
+)
 from .core import checklist, navigation, progress, session, status
 from .core.checklist import Checklist, Item, Section
 from .core.navigation import Direction, Position, Step
@@ -155,6 +175,7 @@ _MODE_KEYS = {
 	**{identifier: "setStatus" for identifier in _DIGIT_STATUSES},
 	"kb:a": "toggleAutoAdvance",
 	"kb:c": "copyFragment",
+	"kb:g": "showWindow",
 	"kb:o": "openChecklist",
 	"kb:p": "speakSectionProgress",
 	"kb:r": "resetSection",
@@ -238,6 +259,9 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 		self._mode = commandmode.CommandMode(self, _MODE_KEYS)
 		#: Where the position between runs of NVDA is kept (section 2).
 		self._state = _state_file()
+		#: The add-on's entry in NVDA's Tools menu, and None when there was
+		#: nowhere to put one. Kept so that `terminate` can take it away again.
+		self._menu_item = self._add_to_tools_menu()
 		#: What the restore could not do, until there is anyone to hear it. None
 		#: when it went well, which section 2 answers with silence.
 		self._startup_failure = self._restore()
@@ -245,7 +269,7 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 		log.info("Axygen Checklist loaded")
 
 	def terminate(self) -> None:
-		"""NVDA is done with this plugin: let go of the timer and the handler.
+		"""NVDA is done with this plugin: let go of everything that outlives it.
 
 		The extension point holds bound methods weakly and would drop the
 		start-up handler on its own, but only whenever the plugin is collected.
@@ -256,10 +280,78 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 		reload of the plugins (`NVDA+Ctrl+F3`), that is a tone from an add-on
 		that no longer exists, and gestures taken off an object nobody is
 		listening to any more.
+
+		The window and the menu item are the same story told in wx. Both belong
+		to NVDA's own GUI rather than to this object, so neither goes anywhere
+		when the plugin does: a reload would leave a window showing a checklist
+		the new plugin knows nothing about, and a second entry in the Tools menu
+		beside it.
 		"""
 		self._mode.disarm()
+		guiwindow.close()
+		self._remove_from_tools_menu()
 		postNvdaStartup.unregister(self._announce_restore)
 		super().terminate()
+
+	def _add_to_tools_menu(self) -> wx.MenuItem | None:
+		"""Put the add-on in NVDA's Tools menu (section 5).
+
+		One of the two ways into the window, and the one that makes it findable:
+		a tester who has not learned the `G` key of the command mode still has
+		somewhere to arrive from. The label is the product name, which is what
+		the window is titled too — a menu entry and a window announcing
+		themselves differently would be the first thing heard and the first thing
+		wrong (section 5).
+
+		None comes back when NVDA has no main frame to hang a menu off, which no
+		ordinary start-up reaches: `gui.initialize()` runs before global plugins
+		are loaded. There is nothing to say out loud about it either — the tester
+		asked for nothing — so it is a line in the log and the `G` key still
+		works.
+		"""
+		frame = gui.mainFrame
+		if frame is None:
+			log.error("no main frame to offer the add-on in the Tools menu of")
+			return None
+		item: wx.MenuItem = frame.sysTrayIcon.toolsMenu.Append(
+			wx.ID_ANY,
+			# Translators: The add-on's entry in the Tools menu of NVDA, which opens the
+			# window showing the whole checklist. It is the product name, which is not
+			# translated in any locale.
+			_("Axygen Checklist"),
+		)
+		frame.sysTrayIcon.Bind(wx.EVT_MENU, self._on_menu_item, item)
+		return item
+
+	def _remove_from_tools_menu(self) -> None:
+		"""Take the entry out of NVDA's Tools menu again.
+
+		The menu belongs to NVDA and outlives this plugin, so an entry left in it
+		after a reload would sit beside the new one and call into a plugin that
+		has gone.
+
+		**The handler comes off before the entry does.** `Bind` leaves the tray
+		icon holding a bound method of this object, and that reference outlives
+		everything else here: an entry taken out of the menu without it would
+		leave a reloaded NVDA holding one dead plugin per reload.
+
+		A menu already destroyed is the ordinary case on the way out of NVDA, and
+		wx answers a call into a destroyed object with `RuntimeError`. There is
+		nothing to do about it and nobody to tell: the menu the entry was in does
+		not exist any more either.
+		"""
+		item = self._menu_item
+		self._menu_item = None
+		frame = gui.mainFrame
+		if item is None or frame is None:
+			return
+		try:
+			frame.sysTrayIcon.Unbind(wx.EVT_MENU, source=item, handler=self._on_menu_item)
+			# `Delete` rather than `Remove`: the second hands the entry back to
+			# us still alive, and there is nothing here that wants one.
+			frame.sysTrayIcon.toolsMenu.Delete(item)
+		except RuntimeError:
+			log.debug("the Tools menu had gone before the add-on's entry in it", exc_info=True)
 
 	def _restore(self) -> _RestoreFailure | None:
 		"""Pick the run up where the last one left it, and say what stopped it.
@@ -611,6 +703,50 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 		# Translators: Spoken when auto-advance has just been turned off, so that giving an item
 		# a verdict leaves the position on the item it was given to.
 		ui.message(_("Auto-advance off"))
+
+	@script(
+		description=_(
+			# Translators: The description of a command, as it appears in NVDA's Input Gestures dialog.
+			"Opens the window showing the whole checklist",
+		),
+	)
+	@blockAction.when(blockAction.Context.MODAL_DIALOG_OPEN)
+	def script_showWindow(self, gesture: inputCore.InputGesture) -> None:
+		# The `G` key of the command mode (section 3.2.2), and the second way to
+		# the one window the Tools menu also leads to (section 5). It may take
+		# the focus, and the focus invariant of section 1 is why it may: the
+		# window costs a deliberately armed mode, so nobody working in someone
+		# else's window arrives here by accident.
+		#
+		# No checklist is asked for, which makes this the third key of the mode
+		# not to, beside `O` and `A`. Section 5 puts the choosing of a file
+		# inside this window, so asking for one at the door would put the way in
+		# behind having come in.
+		self._mode.disarm()
+		self._show_window()
+
+	def _on_menu_item(self, event: wx.CommandEvent) -> None:
+		"""The add-on was picked out of NVDA's Tools menu (section 5).
+
+		The other way to the same window, and it is the same call: which of the
+		two the tester used is not a difference the window is told about.
+		"""
+		self._show_window()
+
+	def _show_window(self) -> None:
+		"""Show the window, on the checklist and the place the commands work on.
+
+		Section 5: whichever way in was used, what the window is given is what
+		every command is given — the checklist in hand and where the tester
+		stands in it — so the node that opens selected is the item the next
+		command would be about. Both may be None, and neither is a refusal: the
+		window opens on an empty tree, and `guiwindow.activate` says why.
+
+		Nothing is remembered here. The window is looked at rather than moved
+		through, so the position it was handed is still the position when it
+		closes (section 5).
+		"""
+		guiwindow.activate(self._checklist, self._position)
 
 	def _choose_checklist(self) -> None:
 		"""Ask the tester which checklist to open (section 3.2.2).

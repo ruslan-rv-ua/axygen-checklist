@@ -39,6 +39,35 @@ msgstr "Копіювати"
 msgid "Cancel"
 msgstr "Скасувати"
 
+# The product name is deliberately left in English in every locale: it is the name the
+# add-on carries in the Add-on Store, in the configuration directory and in its documentation.
+#. Translators: The title of the add-on's own window, which shows the whole
+#. checklist. It is the product name, which is not translated in any locale.
+#. Translators: The title of the add-on's windows: the product name, which is
+#. not translated in any locale.
+#. Translators: The name of the category this add-on's commands appear under
+#. in NVDA's Input Gestures dialog.
+#. Translators: The add-on's entry in the Tools menu of NVDA, which opens the
+#. window showing the whole checklist. It is the product name, which is not
+#. translated in any locale.
+#. Add-on summary/title, usually the user visible name of the add-on
+#. Translators: Summary/title for this add-on
+#. to be shown on installation and add-on information found in add-on store
+msgid "Axygen Checklist"
+msgstr "Axygen Checklist"
+
+#. Translators: The label of the tree of the add-on's window, which holds every
+#. section of the checklist and every item in them.
+msgid "Checklist"
+msgstr "Чекліст"
+
+#. Translators: The label of the read-only panel under the tree of the add-on's
+#. window, which shows the comment left on the selected checklist item.
+#. Translators: The label of the editable field of the item dialog, where the tester
+#. writes their conclusion about the checklist item.
+msgid "Comment"
+msgstr "Коментар"
+
 #. Translators: The title of the window that shows one checklist item in full and
 #. is the only place a comment is written.
 msgid "Checklist item"
@@ -60,28 +89,11 @@ msgstr "Нотатка"
 msgid "Status"
 msgstr "Статус"
 
-#. Translators: The label of the editable field of the item dialog, where the tester
-#. writes their conclusion about the checklist item.
-msgid "Comment"
-msgstr "Коментар"
-
 #. Translators: The label of the button of the item dialog that writes the status
 #. and the comment to the checklist file. The letter after the ampersand is the
 #. mnemonic that activates it.
 msgid "&Save"
 msgstr "&Зберегти"
-
-# The product name is deliberately left in English in every locale: it is the name the
-# add-on carries in the Add-on Store, in the configuration directory and in its documentation.
-#. Translators: The title of the add-on's windows: the product name, which is
-#. not translated in any locale.
-#. Translators: The name of the category this add-on's commands appear under
-#. in NVDA's Input Gestures dialog.
-#. Add-on summary/title, usually the user visible name of the add-on
-#. Translators: Summary/title for this add-on
-#. to be shown on installation and add-on information found in add-on store
-msgid "Axygen Checklist"
-msgstr "Axygen Checklist"
 
 #. Translators: The title of the dialog that picks a checklist file to open.
 msgid "Open a checklist"
@@ -102,18 +114,42 @@ msgstr "Усі файли"
 msgid "passed"
 msgstr "пройдено"
 
+#. Translators: Stands in front of the text of a checklist item in the tree of the
+#. add-on's window, when the item has been checked and works. The colon and the space
+#. are part of it.
+msgid "Passed: "
+msgstr "Пройдено: "
+
 #. Translators: The status of a checklist item that has been checked and does not work.
 msgid "failed"
 msgstr "провалено"
+
+#. Translators: Stands in front of the text of a checklist item in the tree of the
+#. add-on's window, when the item has been checked and does not work. The colon and
+#. the space are part of it.
+msgid "Failed: "
+msgstr "Провалено: "
 
 #. Translators: The status of a checklist item that could not be checked because
 #. something else is in the way.
 msgid "blocked"
 msgstr "заблоковано"
 
+#. Translators: Stands in front of the text of a checklist item in the tree of the
+#. add-on's window, when the item could not be checked because something else is in
+#. the way. The colon and the space are part of it.
+msgid "Blocked: "
+msgstr "Заблоковано: "
+
 #. Translators: The status of a checklist item that was deliberately left unchecked.
 msgid "skipped"
 msgstr "пропущено"
+
+#. Translators: Stands in front of the text of a checklist item in the tree of the
+#. add-on's window, when the item was deliberately left unchecked. The colon and the
+#. space are part of it.
+msgid "Skipped: "
+msgstr "Пропущено: "
 
 #. Translators: The status of a checklist item that has not been checked yet.
 msgid "not checked"
@@ -366,6 +402,10 @@ msgstr "Автоперехід увімкнено"
 #. a verdict leaves the position on the item it was given to.
 msgid "Auto-advance off"
 msgstr "Автоперехід вимкнено"
+
+#. Translators: The description of a command, as it appears in NVDA's Input Gestures dialog.
+msgid "Opens the window showing the whole checklist"
+msgstr "Відкриває вікно, яке показує весь чекліст"
 
 #. Translators: Spoken when there is no section after this one to jump to.
 msgid "End of list"
