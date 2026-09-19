@@ -66,18 +66,30 @@ catalogue of the add-on (section 6), it does not know `wx.ID_SAVE` among its
 buttons at all, and it takes the focus for itself — against the one thing the
 window must open with, the focus in *"Comment"*.
 
-**There is no default button**, and Enter therefore saves nowhere. In the
+**There is no default button**, and plain Enter therefore saves nowhere. In the
 multi-line comment Enter inserts a line (wxMSW gives such controls
 `ES_WANTRETURN`) and never reaches the dialog, and a key that saved in the
 other fields but not in that one would be worse than a key that saves in none.
 Escape is made to mean Cancel explicitly, because wx otherwise sends it to the
 affirmative button when there is no cancel — that is, Escape would save.
 
-**The keyboard needs no code of its own** (section 6), and must not have any.
+**Ctrl+Enter saves from anywhere in the window**, which is the pair to Escape
+and the same convenience: leaving without hunting for the button. The
+objection above does not reach it, and that is why it can exist: an
+accelerator takes precedence over the focused control, so the chord saves
+from every field alike, the comment included. The wxWidgets documentation
+gives this very case as what accelerator tables are for — a dialog with a
+multi-line text control accepting Ctrl+Enter as OK — and outside wx it is the
+settled convention wherever plain Enter makes a new line. Numpad Enter is
+bound with it, as NVDA checks both codes in its own windows.
+
+**The keyboard needs almost no code of its own** (section 6).
 `wx.TE_PROCESS_TAB` is set nowhere, which is what leaves Tab as navigation
-even in the multi-line field, and `EVT_CHAR_HOOK` is bound to nothing: NVDA
+even in a multi-line field, and `EVT_CHAR_HOOK` is bound to nothing: NVDA
 uses it on its settings windows, none of which holds an editable multi-line
-field, and here it would swallow Enter in *"Comment"*.
+field, and here it would swallow Enter in *"Comment"*. The accelerator table
+is the one exception and is not that: a hook sees every key and has to decide
+what to pass on, while a table sees only the chords named in it.
 
 How the window is shown, who gets the focus back and why the series ends with
 it are `modal`'s, as for every window of the add-on.
@@ -215,6 +227,19 @@ class _ItemDialog(wx.Dialog):
 		# this it goes to the affirmative button when there is no cancel one,
 		# and a window guarded by Escape may not save on it (section 3.3.1).
 		self.SetEscapeId(wx.ID_CANCEL)
+		# And Ctrl+Enter means Save, from wherever the focus is. The accelerator
+		# carries the chord to the same handler the button uses — as a menu
+		# command, which is the event an accelerator raises — so there is one
+		# way to save and not two (section 3.3.1).
+		self.Bind(wx.EVT_MENU, self._on_save, id=wx.ID_SAVE)
+		self.SetAcceleratorTable(
+			wx.AcceleratorTable(
+				[
+					wx.AcceleratorEntry(wx.ACCEL_CTRL, wx.WXK_RETURN, wx.ID_SAVE),
+					wx.AcceleratorEntry(wx.ACCEL_CTRL, wx.WXK_NUMPAD_ENTER, wx.ID_SAVE),
+				],
+			),
+		)
 		# Where the window opens (section 3.3.1): in the comment, with the
 		# caret after whatever is already there and nothing selected — a
 		# selection would go under the first letter typed, taking the comment
@@ -258,5 +283,9 @@ class _ItemDialog(wx.Dialog):
 		for its affirmative id, for `wx.ID_APPLY` and for its escape id of its
 		own accord, and `wx.ID_SAVE` is none of the three. Cancel needs no
 		handler for the same rule read the other way — it *is* the escape id.
+
+		Both ways in arrive here: the button as `EVT_BUTTON`, Ctrl+Enter as the
+		`EVT_MENU` an accelerator raises. Which one the tester used is not a
+		difference worth keeping.
 		"""
 		self.EndModal(wx.ID_SAVE)
