@@ -350,6 +350,23 @@ msgstr "Копіює фрагмент поточного пункту чеклі
 msgid "The item has no fragments"
 msgstr "У пункті немає фрагментів"
 
+#. Translators: The description of a command, as it appears in NVDA's Input Gestures dialog.
+msgid ""
+"Turns on or off moving to the next checklist item once this one has a verdict"
+msgstr ""
+"Вмикає або вимикає перехід до наступного пункту чекліста після присвоєння "
+"вердикту"
+
+#. Translators: Spoken when auto-advance has just been turned on, so that giving an
+#. item a verdict moves on to the next item of the checklist.
+msgid "Auto-advance on"
+msgstr "Автоперехід увімкнено"
+
+#. Translators: Spoken when auto-advance has just been turned off, so that giving an item
+#. a verdict leaves the position on the item it was given to.
+msgid "Auto-advance off"
+msgstr "Автоперехід вимкнено"
+
 #. Translators: Spoken when there is no section after this one to jump to.
 msgid "End of list"
 msgstr "Кінець списку"

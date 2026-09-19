@@ -112,7 +112,7 @@ from gui import blockAction
 from logHandler import log
 from scriptHandler import script
 
-from . import commandmode, fragmentsdialog, itemdialog, modal, signals, wording
+from . import commandmode, fragmentsdialog, itemdialog, modal, preferences, signals, wording
 from .core import checklist, navigation, progress, session, status
 from .core.checklist import Checklist, Item, Section
 from .core.navigation import Direction, Position, Step
@@ -153,6 +153,7 @@ _DIGIT_STATUSES = {
 #: the currency the whole construction is bought with.
 _MODE_KEYS = {
 	**{identifier: "setStatus" for identifier in _DIGIT_STATUSES},
+	"kb:a": "toggleAutoAdvance",
 	"kb:c": "copyFragment",
 	"kb:o": "openChecklist",
 	"kb:p": "speakSectionProgress",
@@ -479,10 +480,11 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 		# cheat sheet writes that line out in full. The cost of getting it wrong
 		# is a tone instead of a window, and nothing else.
 		#
-		# The one command of the add-on that asks for no checklist: this is how
-		# a checklist arrives. `_standing` is not called, and nothing here says
-		# "No checklist loaded" — that would put the only way in behind having
-		# already come in.
+		# One of the two commands that ask for no checklist, and this one is how
+		# a checklist arrives at all. `_standing` is not called, and nothing
+		# here says "No checklist loaded" — that would put the only way in
+		# behind having already come in. `A` is the other, for a reason of its
+		# own (section 4): what it toggles does not live in the file.
 		self._mode.disarm()
 		self._choose_checklist()
 
@@ -572,6 +574,43 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 			self._copy(found[0])
 			return
 		fragmentsdialog.show(found, self._copy_later)
+
+	@script(
+		description=_(
+			# Translators: The description of a command, as it appears in NVDA's Input Gestures dialog.
+			"Turns on or off moving to the next checklist item once this one has a verdict",
+		),
+	)
+	@blockAction.when(blockAction.Context.MODAL_DIALOG_OPEN)
+	def script_toggleAutoAdvance(self, gesture: inputCore.InputGesture) -> None:
+		# The `A` key of the command mode (section 3.2.2), in the shape NVDA
+		# gives its own toggles: assign in `config.conf`, then say the new state
+		# (`script_toggleSpeakCommandKeys` and the rest of `globalCommands.py`).
+		# The position is left where it was — like the filter of section 3.4,
+		# this changes a mode rather than moving anyone.
+		#
+		# **No checklist is asked for** (section 4), which makes this the second
+		# key of the mode not to, beside `O`. The preference lives in NVDA's
+		# configuration rather than in the file, so there is nothing here a
+		# checklist would supply; answering "No checklist loaded" would mean
+		# either refusing to write the option, against the requirement to write
+		# it at once, or writing it and then saying something else had happened.
+		#
+		# The two phrases are spoken from here and nowhere else, so they stay
+		# here rather than going to `wording`: the checkbox of the GUI (section
+		# 5) is the other way to the same option, and a checkbox is announced by
+		# NVDA out of its own label.
+		self._mode.disarm()
+		enabled = not preferences.auto_advance()
+		preferences.set_auto_advance(enabled)
+		if enabled:
+			# Translators: Spoken when auto-advance has just been turned on, so that giving an
+			# item a verdict moves on to the next item of the checklist.
+			ui.message(_("Auto-advance on"))
+			return
+		# Translators: Spoken when auto-advance has just been turned off, so that giving an item
+		# a verdict leaves the position on the item it was given to.
+		ui.message(_("Auto-advance off"))
 
 	def _choose_checklist(self) -> None:
 		"""Ask the tester which checklist to open (section 3.2.2).
@@ -711,9 +750,30 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 		if found is None:
 			self._refuse(direction, jump=jump)
 			return
+		self._land(loaded, found, name_the_section=jump)
+
+	def _land(self, loaded: Checklist, found: Position, name_the_section: bool = False) -> None:
+		"""Stand on `found`, put that on disk, and say what is there.
+
+		What every move of the position does, whoever made it: the navigation
+		keys (section 3.1) and auto-advance (section 4) both end here. The
+		order is the rule rather than the convenience — the position reaches
+		`state.json` **before** the item is spoken (sections 2 and 4), which is
+		the same order a change of data is held to and holds for the same
+		reason: the disk has stopped the keyboard either way, and all that is
+		chosen is where inside that pause the voice starts.
+
+		`name_the_section` belongs to the jump between sections and to nothing
+		else (section 3.1): a step to the next item would be paying for a word
+		the tester already knows, on every press.
+
+		Opening a checklist does not come through here, and that is not an
+		oversight: it moves the path as well as the position, and what it says
+		afterwards has to outlive a window closing (section 3.2.2).
+		"""
 		self._position = found
 		self._remember()
-		self._speak(loaded, found, name_the_section=jump)
+		self._speak(loaded, found, name_the_section=name_the_section)
 
 	def _remember(self) -> None:
 		"""Put the position on disk, now (section 2).
@@ -851,8 +911,12 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 		two callers here is the digit that puts an item back to `pending`.
 
 		The write, and what is said when it does not get there, are `_write`'s
-		(section 4); the status word and the end-of-run notice follow only once
-		the file holds the verdict they are about.
+		(section 4); the status word, the end-of-run notice and the move on to
+		the next item follow only once the file holds the verdict they are
+		about, and in that order. Section 4 puts the phrase describing **where
+		the tester stands now** last, because that is the place the next command
+		will be about; a run that ended is news about what has just happened,
+		and belongs with the word for it.
 		"""
 		standing = self._standing()
 		if standing is None:
@@ -863,6 +927,60 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 			return
 		ui.message(wording.status_word(item.status))
 		self._announce_completion(loaded)
+		self._advance(loaded, position, item.status)
+
+	def _advance(self, loaded: Checklist, marked: Position, recorded: str) -> None:
+		"""Move on to the next visible item, when a verdict has just been given.
+
+		Auto-advance (section 4), and the whole of it is which presses reach
+		here: this is called from `_record_status` and from nowhere else.
+
+		**A verdict moves, a return to `pending` stays.** The rule is *move on
+		after a verdict, stop after a correction*, and `core.status.is_verdict`
+		is the one place the two are told apart. The digit `5` and a space bar
+		pressed on a `passed` item both mean the tester is fixing something and
+		wants to stay on the item to read it again — the "undo" slot would be
+		useless if it moved.
+
+		The same rule has two more cases, and neither of them is here rather
+		than by accident. A save from the item dialog does not reach this method
+		at all (section 3.3.1): the dialog is a deliberate stop on one item, and
+		moving the position behind a closing window would leave the next command
+		describing something else. And a write that failed returns before this
+		(`_record_status`), which is **stop after a refusal**: the tester will
+		press on this item again, and a shifted position would send the repeat
+		to the wrong one.
+
+		`marked` is where the verdict was recorded, which is where the tester
+		still stands: nothing has moved the position between the write and here.
+
+		The scan is the one of section 3.4, forward, one item, through the
+		visibility predicate — the same call a single press of the navigation
+		key makes, because "the next visible item" is one idea and not two. In
+		0.1.0 the predicate is identically true, so this is literally the next
+		item; in 0.2.0 it becomes the next `pending` one and nothing here
+		changes.
+
+		**Nothing at the end of the checklist**: no tone, no message, the
+		position simply stays (section 4). The tester gave no navigation
+		command, so the boundary signal of section 3.1 would be reporting a
+		failure that did not happen. That is the whole difference from a
+		navigation key running off the end, and it is why this does not answer
+		through `_refuse`; landing is the same operation for both, and
+		`_land` is where it is written.
+		"""
+		if not status.is_verdict(recorded) or not preferences.auto_advance():
+			return
+		found = navigation.scan(
+			loaded,
+			marked,
+			Direction.FORWARD,
+			Step.ITEM,
+			navigation.unfiltered,
+		)
+		if found is None:
+			return
+		self._land(loaded, found)
 
 	def _save_item(self, loaded: Checklist, item: Item, status_value: str, comment: str) -> None:
 		"""Write what the item dialog was closed on, and say what moved (section 3.3.1).

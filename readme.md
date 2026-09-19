@@ -31,12 +31,11 @@ under the category **Axygen Checklist**.
 
 This page describes the add-on as a whole, and not all of it is built yet.
 Walking a checklist works: a file opens, the commands move through it, an item
-takes a status, the item dialog shows it in full and takes a comment, a
-fragment of an item goes to the clipboard, and the run says so when nothing is
-left unchecked. What is missing sits around that core.
+takes a status and the run moves on to the next one by itself, the item dialog
+shows it in full and takes a comment, a fragment of an item goes to the
+clipboard, and the run says so when nothing is left unchecked. What is missing
+sits around that core.
 
-* **Auto-advance**, which moves on to the next item once the current one has a
-  verdict. Until 0.1.0 every move is your own.
 * **The GUI window**: the tree of the whole checklist, the comment of the
   selected item, and the button that resets the lot. Due in 0.1.0.
 * **Filtering to unchecked items** — due in 0.2.0.
