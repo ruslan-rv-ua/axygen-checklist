@@ -7,7 +7,7 @@ msgstr ""
 "Project-Id-Version: 'axygenChecklist' '0.0.0'\n"
 "Report-Msgid-Bugs-To: 'https://github.com/ruslan-rv-ua/axygen-checklist/"
 "issues'\n"
-"POT-Creation-Date: 2026-09-19 12:44+0300\n"
+"POT-Creation-Date: 2026-09-19 13:40+0300\n"
 "PO-Revision-Date: 2026-09-16 20:04+0300\n"
 "Last-Translator: Ruslan Iskov <ruslan.rv.ua@gmail.com>\n"
 "Language-Team: Ukrainian\n"
@@ -87,6 +87,17 @@ msgstr "&Перейти до"
 #. activates it.
 msgid "&Close"
 msgstr "&Закрити"
+
+#. Translators: The label of the field of the add-on's window that holds the path
+#. of the checklist which is open. The button beside it picks another file.
+msgid "Checklist file"
+msgstr "Файл чекліста"
+
+#. Translators: The label of the button of the add-on's window that picks the
+#. checklist file to open. It deliberately repeats NVDA's own label for a button
+#. that browses for a path, so the Ukrainian catalogue has to repeat it too.
+msgid "Browse..."
+msgstr "Огляд..."
 
 #. Translators: The title of the window that shows one checklist item in full and
 #. is the only place a comment is written.

@@ -36,9 +36,11 @@ way in its own Elements List. Ctrl+Enter presses "Move to", through the
 accelerator table, and that one closes the window.
 
 **The window collects, and it decides nothing.** Where the tester asked to be
-moved to comes back out of `show` as a `Position`, and what a save from the
-item dialog amounts to goes straight out to `on_save`: whether anything
-changed, what reaches the file and what is spoken are settled where every
+moved to comes back out of `show` as a `Position`; what a save from the item
+dialog amounts to goes straight out to `on_save`; and the file picked with
+`Browse...` goes out to `on_browse`, which answers with the checklist that is
+now open or with the reason it is not. Whether anything changed, what reaches
+the file, what `state.json` gets and what is spoken are settled where every
 other change of data is settled, in the plugin and the core.
 
 **One module-level reference, and it is there for `close()`.** A reload of the
@@ -53,6 +55,7 @@ window are section 5's; the words for a status are `wording`'s, as everywhere.
 
 import dataclasses
 from collections.abc import Callable
+from pathlib import Path
 
 import addonHandler
 import wx
@@ -77,11 +80,38 @@ _PANEL_HEIGHT = 80
 _window: "_ChecklistWindow | None" = None
 
 
+@dataclasses.dataclass(frozen=True)
+class Standing:
+	"""A checklist and the place in it the tester stands — what the tree is built from.
+
+	What `Browse...` gets back when a file opened (section 5.3). `position` is
+	None for a checklist there is nowhere to stand in, exactly as it is at the
+	door: section 2 asks a file for at least one section and never for a
+	minimum of items.
+
+	Where the tester stands after opening a file is not this window's to decide
+	— section 3.2.2 settles it, the same file landing where it was left and
+	another starting at its first item — so what arrives here is an answer
+	rather than a question.
+	"""
+
+	checklist: Checklist
+	position: Position | None
+
+
+#: What `Browse...` makes of the file the tester picked: where they now stand,
+#: or the reason the file was refused — which field, which item, which value
+#: (sections 2 and 5). One or the other, never both and never neither, which is
+#: what a union says and a record with two optional halves would not.
+Browsed = Standing | str
+
+
 def show(
 	checklist: Checklist | None,
 	position: Position | None,
 	on_move: Callable[[Position], None],
 	on_save: Callable[[Item, str, str], None],
+	on_browse: Callable[[Path], Browsed],
 ) -> None:
 	"""Open the window on `checklist`, standing on `position` (section 5).
 
@@ -105,13 +135,19 @@ def show(
 	the landing has to outlive that (sections 5.1 and 6). `on_save` is called
 	for a save from the item dialog, while the window still stands, and is
 	handed the item and the pair the dialog collected (section 5.2).
+
+	`on_browse` is called with the file the tester picked with `Browse...`, and
+	answers with what became of it — the checklist that is now open, or the
+	sentence saying why it is not (section 5.3). Opening a file is a change of
+	data like any other and is settled where they all are; what comes back is
+	what the window has left to do about it, which is to show it.
 	"""
 
 	def build_and_hold(parent: wx.Window) -> "_ChecklistWindow":
 		# Named for the second half: the window is also put where `close` can
 		# reach it, which is the whole reason this module keeps a name at all.
 		global _window
-		_window = _ChecklistWindow(parent, checklist, position, on_save)
+		_window = _ChecklistWindow(parent, checklist, position, on_save, on_browse)
 		return _window
 
 	def answered(dialog: "_ChecklistWindow", answer: int) -> None:
@@ -205,6 +241,7 @@ class _ChecklistWindow(wx.Dialog):
 		checklist: Checklist | None,
 		position: Position | None,
 		on_save: Callable[[Item, str, str], None],
+		on_browse: Callable[[Path], Browsed],
 	) -> None:
 		super().__init__(
 			parent,
@@ -213,6 +250,10 @@ class _ChecklistWindow(wx.Dialog):
 			title=_("Axygen Checklist"),
 		)
 		self._on_save = on_save
+		#: What the plugin makes of a file picked with `Browse...`. Named for
+		#: what it does rather than after the button, because `_on_browse` — the
+		#: handler the button is bound to — has that name already.
+		self._open_file = on_browse
 		#: Where "Move to" was asked to go, and None until it is asked; see
 		#: `chosen_position`.
 		self._chosen: Position | None = None
@@ -220,6 +261,7 @@ class _ChecklistWindow(wx.Dialog):
 		# and nothing to hold one: that panel existed only to give a frame the
 		# Tab walk it has not got (sections 5 and 6).
 		contents = guiHelper.BoxSizerHelper(self, orientation=wx.VERTICAL)
+		contents.addItem(self._build_browse_row(), flag=wx.EXPAND)
 		self._tree: wx.TreeCtrl = contents.addLabeledControl(
 			# Translators: The label of the tree of the add-on's window, which holds every
 			# section of the checklist and every item in them.
@@ -295,8 +337,62 @@ class _ChecklistWindow(wx.Dialog):
 		)
 		self._fill(checklist, position)
 		# Where the window opens (section 5): on the tree, which is the window.
+		# The row above it is first in the Tab walk and last to want the focus.
 		self._tree.SetFocus()
 		self.CentreOnScreen()
+
+	def _build_browse_row(self) -> wx.Sizer:
+		"""The first row of the window: the file that is open, and the way to another.
+
+		Section 5 puts this before the tree, and the order **inside** it is
+		load-bearing as well: the label, then the field, then the button. The
+		description NVDA reads out when it announces a dialog keeps a label
+		whenever the control right after it is a button (section 6), so a
+		button between the two would put *"Checklist file"* back into it — and
+		the path would be read at every opening, which is the one thing the
+		shape of this field exists to prevent.
+
+		**The field is editable**, and that is a requirement rather than a taste
+		(sections 5 and 6). A single-line read-only field is dropped out of the
+		Tab walk by wxWidgets and read into the description of the window by
+		NVDA; an editable one does neither. What is typed into it opens nothing
+		— only `Browse...` does — and says where the browsing starts, which is
+		what NVDA does with the same pair in `guiHelper.PathSelectionHelper`.
+		"""
+		label = wx.StaticText(
+			self,
+			# Translators: The label of the field of the add-on's window that holds the path
+			# of the checklist which is open. The button beside it picks another file.
+			label=_("Checklist file"),
+		)
+		# No width is asked for, unlike the tree and the panel below: the row
+		# takes the one the tree has already settled, and the field takes what
+		# is left of it once the label and the button have theirs. A width of
+		# its own would make this row the widest thing in the window and widen
+		# the window to suit.
+		self._path = wx.TextCtrl(self)
+		browse = wx.Button(
+			self,
+			# Translators: The label of the button of the add-on's window that picks the
+			# checklist file to open. It deliberately repeats NVDA's own label for a button
+			# that browses for a path, so the Ukrainian catalogue has to repeat it too.
+			label=_("Browse..."),
+		)
+		browse.Bind(wx.EVT_BUTTON, self._on_browse)
+		# The button is not kept: it never changes, unlike the two below the
+		# tree, which are enabled and disabled as the selection moves.
+		row = wx.BoxSizer(wx.HORIZONTAL)
+		row.Add(label, flag=wx.ALIGN_CENTER_VERTICAL)
+		row.AddSpacer(guiHelper.SPACE_BETWEEN_ASSOCIATED_CONTROL_HORIZONTAL)
+		# The field and the button are a pair NVDA has a spacing for, and the
+		# label is put in front of the pair rather than of the field alone
+		# because that is the order above.
+		row.Add(
+			guiHelper.associateElements(self._path, browse),
+			proportion=1,
+			flag=wx.ALIGN_CENTER_VERTICAL,
+		)
+		return row
 
 	@property
 	def chosen_position(self) -> Position | None:
@@ -315,7 +411,16 @@ class _ChecklistWindow(wx.Dialog):
 		structure and a collapsed section hides the thing the window was opened
 		for. Selecting a node is not optional either: a tree holding no
 		selection announces itself by the name of the control alone.
+
+		**The path field is filled here too**, which is what section 5 means by
+		filling it along with the tree: the two ways this runs are the two ways
+		a file becomes the one on show — the window opening, and a `Browse...`
+		that found a checklist. A file that was refused reaches neither, so
+		nothing in the window claims it (section 5.3).
 		"""
+		self._path.SetValue(
+			"" if checklist is None or checklist.path is None else str(checklist.path),
+		)
 		self._tree.DeleteAllItems()
 		root = self._tree.AddRoot("")
 		standing = None
@@ -425,6 +530,48 @@ class _ChecklistWindow(wx.Dialog):
 			wx.Bell()
 			return
 		_ = self._open_item.ProcessEvent(wx.CommandEvent(wx.wxEVT_COMMAND_BUTTON_CLICKED, wx.ID_ANY))
+
+	def _on_browse(self, event: wx.CommandEvent) -> None:
+		"""Ask which checklist to open (section 5).
+
+		The second way to the file dialog, beside the `O` key of the command
+		mode (section 3.2.2), and the same window: what differs is the parent
+		it hangs off, which `modal.show` holds. The browsing starts where the
+		path field points, and the answer arrives long after this has returned,
+		in `_picked`.
+		"""
+		modal.choose_file(self._starting_folder(), self._picked, parent=self)
+
+	def _starting_folder(self) -> Path | None:
+		"""Where the browsing starts: the folder of the path in the field (section 5).
+
+		None when the field is empty — no checklist is open, and nothing has
+		been typed — which leaves the choice to Windows. Whatever else stands
+		there is taken as the path of a file, because that is what the field
+		holds; a path that names nothing on the disk costs nothing either, as
+		the file dialog falls back to a folder of its own.
+		"""
+		typed = self._path.GetValue().strip()
+		return Path(typed).parent if typed else None
+
+	def _picked(self, path: Path) -> None:
+		"""A file was picked: show the checklist it holds, or why it holds none.
+
+		Section 5.3, and both halves of it. A file that opened rebuilds the
+		tree **whole** — the selection and the expansion are nothing to keep
+		here, because the tree is showing another file — and says nothing:
+		while the window stands the add-on speaks only of failures (section 5).
+		A file that did not open leaves the window exactly as it was and shows
+		the concrete reason, which field, which item, which value (section 2).
+
+		Which of the two it is, the plugin has already decided; the window is
+		told, and shows it.
+		"""
+		answer = self._open_file(path)
+		if isinstance(answer, str):
+			modal.report(answer, parent=self)
+			return
+		self._fill(answer.checklist, answer.position)
 
 	def _on_open_item(self, event: wx.CommandEvent) -> None:
 		"""Open the item dialog on the selected item (section 5.2).

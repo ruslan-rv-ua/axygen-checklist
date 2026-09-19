@@ -32,12 +32,15 @@ here rather than left to `displayDialogAsModal` because that function calls it
 itself only for a window without a parent, and a window without a parent is not
 one section 6 allows.
 
-**One window is opened from another, and `show` takes a `parent` for it.** The
-item dialog reached from the tree of the GUI window (section 5.2) hangs off
-that window instead, and then the pair above is not called at all and the
-series is not cleared: both are about coming in from somebody else's
-application, and this one comes in from ours. `show` says what each of the
-three changes is for.
+**A window opened from another window of ours takes a `parent`, and `show`
+holds what that changes.** Three are so far, all from the GUI window (sections
+5 and 6): the item dialog reached from the tree, and the file dialog and the
+error of `Browse...`. Each hangs off that window instead, the pair above is not
+called at all and the series is not cleared: both are about coming in from
+somebody else's application, and these come in from ours. `show` says what each
+of the three changes is for. Section 6 counts a fourth, the confirmation before
+the whole run is reset; `confirm` takes no parent yet because that button is
+not built.
 
 **The series ends with the window** (section 6). `scriptHandler.clearLastScript()`
 is called on the way in, for every window a script opened and not only the item
@@ -67,10 +70,11 @@ is a no-op.
 What a window says and which buttons it has is the business of the window. The
 three built at the bottom are the shapes more than one command shares, so each
 is built once: the confirmation, asked before a section is reset (section 3.2.2)
-and before the run is (section 5); the file dialog, opened by the `O` key and by
-a start-up that found its checklist gone (sections 3.2.2 and 2); and the error,
-shown for a file the tester picked themselves, whether by `O` or by `Browse...`
-in the GUI (sections 3.2.2 and 5). The first two are NVDA's own `MessageDialog`,
+and before the run is (section 5); the file dialog, opened by the `O` key, by
+`Browse...` in the GUI window and by a start-up that found its checklist gone
+(sections 3.2.2, 5 and 2); and the error, shown for a file the tester picked
+themselves, whichever of the first two they picked it with (sections 3.2.2 and
+5). The first two are NVDA's own `MessageDialog`,
 and their buttons are labelled from NVDA's catalogue rather than ours — the same
 move as the copy confirmation of section 3.2.2: the tester hears the words every
 other question of the screen reader uses.
@@ -153,10 +157,10 @@ def show(
 	been destroyed by the time the next is built, because `show` schedules
 	rather than shows. That is the path from the file dialog to the error.
 
-	**`parent` is for the one window opened from another window of the add-on**
-	— the item dialog reached from the tree of the GUI window (section 5.2) —
-	and passing it changes three things at once, all for the same reason: the
-	foreground already belongs to us. The window hangs off that one rather than
+	**`parent` is for a window opened from another window of the add-on** — the
+	ones the GUI window opens (sections 5 and 6) — and passing it changes three
+	things at once, all for the same reason: the foreground already belongs to
+	us. The window hangs off that one rather than
 	off `gui.mainFrame`; `prePopup()` / `postPopup()` are not called, because
 	the first brings NVDA forward out of somebody else's application and the
 	second would blank `gui.mainFrame.prevFocus` in the middle of the outer
@@ -280,7 +284,11 @@ def confirm(question: str, on_yes: Callable[[], None]) -> None:
 	show(create, answered)
 
 
-def choose_file(folder: Path | None, then: Callable[[Path], None]) -> None:
+def choose_file(
+	folder: Path | None,
+	then: Callable[[Path], None],
+	parent: wx.Window | None = None,
+) -> None:
 	"""Ask which checklist to open, and hand the file the tester picked to `then`.
 
 	The standard file dialog of section 3.2.2, opened by the `O` key of the
@@ -292,6 +300,11 @@ def choose_file(folder: Path | None, then: Callable[[Path], None]) -> None:
 	`folder` is where the browsing starts — the folder of the last path in
 	`state.json`, which is lying there anyway (section 3.2.2) — and None when
 	nothing has ever been opened, which leaves the choice to Windows.
+
+	`parent` is the third way in: `Browse...` in the GUI window (section 5),
+	which passes that window and gets what `show` makes of a parent. The
+	starting folder then comes off the path field rather than off the disk,
+	which is that button's business rather than this one's.
 
 	A cancelled dialog calls nothing and says nothing, the same silence as "No"
 	above. The window is native rather than one of NVDA's, and nothing about
@@ -329,10 +342,10 @@ def choose_file(folder: Path | None, then: Callable[[Path], None]) -> None:
 		if answer == wx.ID_OK:
 			then(Path(dialog.GetPath()))
 
-	show(create, chosen)
+	show(create, chosen, parent)
 
 
-def report(text: str) -> None:
+def report(text: str, parent: wx.Window | None = None) -> None:
 	"""Show `text` as the error it is, and say nothing out loud.
 
 	Why a file the tester picked themselves would not load (sections 2, 3.2.2
@@ -341,17 +354,21 @@ def report(text: str) -> None:
 	section 4 separates from a file that loaded without anyone asking — that
 	one gets four words spoken and no window at all.
 
+	`parent` is the GUI window when the file was picked with `Browse...`
+	(section 5), and None when it was picked by the `O` key. It goes straight
+	to `show`, which holds what a parent of our own changes.
+
 	An error, so the icon and the sound are the ones NVDA gives one. Escape
 	closes it without any help from us — a `MessageDialog` falls back to its
 	affirmative button when it has no cancel, and OK is the only button here.
 	"""
 
-	def create(parent: wx.Window) -> MessageDialog:
+	def create(owner: wx.Window) -> MessageDialog:
 		return MessageDialog(
-			parent,
+			owner,
 			text,
 			_title(),
 			DialogType.ERROR,
 		)
 
-	show(create)
+	show(create, parent=parent)

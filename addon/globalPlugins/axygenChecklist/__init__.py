@@ -750,13 +750,46 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 		command would be about. Both may be None, and neither is a refusal: the
 		window opens on an empty tree, and `guiwindow.show` says why.
 
-		Nothing is remembered here, and the two callbacks are why nothing needs
-		to be: selecting in the tree is a view and moves no one (section 5), and
-		the two things that do change something come back out as calls. "Move
+		Nothing is remembered here, and the callbacks are why nothing needs to
+		be: selecting in the tree is a view and moves no one (section 5), and
+		everything that does change something comes back out as a call. "Move
 		to" arrives once the window has closed, which is what makes `_move_to`
-		speak late; a save from the item dialog arrives while it still stands.
+		speak late; a save from the item dialog and a file picked with
+		`Browse...` arrive while it still stands.
 		"""
-		guiwindow.show(self._checklist, self._position, self._move_to, self._save_from_window)
+		guiwindow.show(
+			self._checklist,
+			self._position,
+			self._move_to,
+			self._save_from_window,
+			self._browse,
+		)
+
+	def _browse(self, path: Path) -> guiwindow.Browsed:
+		"""Open the file picked with `Browse...`, and say what became of it (section 5).
+
+		The second way to open a checklist, and `_load` is the first thing it
+		reaches: the file, the position it lands on and the write to
+		`state.json` are settled there, once, for this and for the `O` key
+		alike (section 3.2.2).
+
+		What differs is everything after, and both halves are the window's rule
+		of silence (section 5.3). Nothing is spoken — neither the item landed
+		on nor the fact that a file opened — because the window still stands
+		and NVDA has its own proof to give; and the refusal is handed back
+		rather than shown, because the window it belongs over is the GUI window
+		rather than `gui.mainFrame` (section 6).
+
+		`state.json` is read here rather than carried in from the window: the
+		window knows where the tester stands in the checklist, and this needs
+		what the **file** remembers about the one they just picked. Nothing can
+		have changed it in between — the add-on is the only writer, and its
+		commands are blocked while the window stands (section 3.3.1).
+		"""
+		answer = self._load(path, session.load(self._state))
+		if isinstance(answer, str):
+			return answer
+		return guiwindow.Standing(answer, self._position)
 
 	def _move_to(self, found: Position) -> None:
 		"""Stand where the window was asked to move to (section 5.1).
@@ -836,45 +869,70 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 	def _open(self, path: Path, remembered: Session) -> None:
 		"""Open the checklist the tester just picked, or show why it will not open.
 
-		The far side of the file dialog (section 3.2.2). A refusal goes into a
-		window here, and that is the whole difference from the same failure at
-		start-up: section 4 forbids a window for a file that loaded without
-		anyone asking, and requires the concrete reason — which field, which
-		item, which value — for one the tester chose themselves and is waiting
-		on. Both sentences are built from the same `Problem`, so neither path
-		has a wording of its own (section 2).
+		The far side of the file dialog opened by `O` (section 3.2.2). The
+		opening itself is `_load`'s, and what is left here is what belongs to
+		this way in: a refusal goes into a window, and a file that opened is
+		spoken. Both are the difference from the same load at start-up, where
+		section 4 forbids the window and allows only four words — the person
+		who pressed "Open" is waiting for an answer, and one who pressed
+		nothing is not.
 
-		A file that could not be opened at all has no field, item or value to
-		name, and the window then shows the same short sentence the voice would
-		have used: which encoding the author had in mind, or what the file
-		system's objection was, is not something the add-on can say. It should
-		not happen — the dialog only offers files that exist — but a file can
+		A refusal that names a file which could not be opened at all should not
+		happen, since the dialog only offers files that exist, but a file can
 		be taken away or locked between the picking and the opening.
 
-		**A refusal leaves `state.json` alone** (section 2), which this gets by
-		writing nothing on the way out: the path in it is where the file dialog
-		starts browsing, and erasing it here would erase it exactly when it is
-		needed. The position and the checklist in hand stay as they were too —
-		a file that would not open has not replaced the one that did.
-
-		`remembered` is what that file said when the dialog was opened, read
+		`remembered` is what `state.json` said when the dialog was opened, read
 		once by `_choose_checklist` and carried here rather than read again.
+		"""
+		answer = self._load(path, remembered)
+		if isinstance(answer, str):
+			modal.report(answer)
+			return
+		self._speak_opened(answer)
+
+	def _load(self, path: Path, remembered: Session) -> Checklist | str:
+		"""Open the checklist at `path` and stand in it, or say why it will not open.
+
+		The whole of opening a file, and the one place it happens: the `O` key
+		gets here through `_open` and `Browse...` in the GUI window through
+		`_browse` (sections 3.2.2 and 5). Section 3.2.2 calls those one
+		operation differing only in where the path came from, and this is the
+		operation — down to where the tester lands, which `_adopt` settles the
+		same way for both.
+
+		The answer is the checklist that is now open, or the sentence saying why
+		none is — one or the other, and the caller tells them apart by asking
+		whether it got a string. The sentence is the long form, which names the
+		field, the item and the value (section 2): both callers were asked by
+		the tester and both show a window, so the short spoken form section 4
+		keeps for a file nobody asked for belongs to neither. Both build it from
+		the same `Problem`, which is the one source of the wording the add-on is
+		allowed.
+
+		A file that could not be opened at all has no field, item or value to
+		name, and what is shown is then the same short sentence the voice would
+		have used: which encoding the author had in mind, or what the file
+		system objected to, is not something the add-on can say.
+
+		**A refusal leaves everything as it was** (section 2): `state.json` is
+		not written, and neither the position nor the checklist in hand moves.
+		A file that would not open has not replaced the one that did, and the
+		path in `state.json` is where the file dialog starts browsing — erasing
+		it here would erase it exactly when it is needed.
 		"""
 		try:
 			loaded = checklist.load(path)
 		except OSError:
 			log.error(f"could not read the checklist at {path}", exc_info=True)
-			modal.report(wording.shown_refusal())
-			return
+			return wording.shown_refusal()
 		except checklist.ChecklistError as refusal:
-			modal.report(wording.shown_refusal(refusal.problem))
-			return
+			return wording.shown_refusal(refusal.problem)
 		self._adopt(loaded, remembered.position_in(path))
 		# The path and the position reach the disk now, as after any other
 		# change of position (section 2), and a write that does not get there is
 		# a line in the log; `_remember` holds both halves of that rule.
 		self._remember()
-		self._speak_opened(loaded)
+		return loaded
 
 	def _adopt(self, loaded: Checklist, remembered: Position | None) -> None:
 		"""Make `loaded` the checklist every command works on, standing where it was left.

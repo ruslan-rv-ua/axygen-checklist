@@ -35,11 +35,12 @@ takes a status and the run moves on to the next one by itself, the item dialog
 shows it in full and takes a comment, a fragment of an item goes to the
 clipboard, and the run says so when nothing is left unchecked. The window opens
 too, on the tree of the whole checklist and the comment of whatever is selected
-in it; Enter on an item opens the item dialog there, and Ctrl+Enter moves the
-run to that item and closes the window. What is missing sits around that core.
+in it; Enter on an item opens the item dialog there, Ctrl+Enter moves the run
+to that item and closes the window, and Browse... picks another checklist
+without leaving it. What is missing sits around that core.
 
-* **The rest of the window**: choosing a file in it, the auto-advance checkbox,
-  and the button that resets the lot. Due in 0.1.0.
+* **The rest of the window**: the auto-advance checkbox and the button that
+  resets the lot. Due in 0.1.0.
 * **Filtering to unchecked items** — due in 0.2.0.
 
 Until 1.0.0 the checklist file format and the set of commands may still change
