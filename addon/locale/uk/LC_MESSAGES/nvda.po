@@ -7,6 +7,7 @@ msgstr ""
 "Project-Id-Version: 'axygenChecklist' '0.0.0'\n"
 "Report-Msgid-Bugs-To: 'https://github.com/ruslan-rv-ua/axygen-checklist/"
 "issues'\n"
+"POT-Creation-Date: 2026-09-19 12:44+0300\n"
 "PO-Revision-Date: 2026-09-16 20:04+0300\n"
 "Last-Translator: Ruslan Iskov <ruslan.rv.ua@gmail.com>\n"
 "Language-Team: Ukrainian\n"
@@ -67,6 +68,25 @@ msgstr "Чекліст"
 #. writes their conclusion about the checklist item.
 msgid "Comment"
 msgstr "Коментар"
+
+#. Translators: The label of the button of the add-on's window that opens the
+#. selected checklist item in the item dialog. The letter after the ampersand is
+#. the mnemonic that activates it.
+msgid "&Open item"
+msgstr "&Відкрити пункт"
+
+#. Translators: The label of the button of the add-on's window that makes the
+#. selected node the current position and closes the window. It deliberately
+#. repeats the wording of NVDA's own Elements List. The letter after the ampersand
+#. is the mnemonic that activates it.
+msgid "&Move to"
+msgstr "&Перейти до"
+
+#. Translators: The label of the button of the add-on's window that closes it.
+#. Escape does the same. The letter after the ampersand is the mnemonic that
+#. activates it.
+msgid "&Close"
+msgstr "&Закрити"
 
 #. Translators: The title of the window that shows one checklist item in full and
 #. is the only place a comment is written.

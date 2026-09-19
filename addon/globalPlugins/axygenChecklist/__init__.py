@@ -86,10 +86,11 @@ the fact, since the loop is up before the first focus has been reported.
 The `G` key of the command mode is a script like any other; the entry in NVDA's
 Tools menu is a `wx` menu item, which belongs to the screen reader's own GUI
 rather than to this object and therefore has to be taken back out of it when
-NVDA is done with the plugin. Both ways end in the same call. The window itself
-is `guiwindow`'s, and it is the one window of the add-on that is not modal — so
-unlike the four that are, every command here goes on working while it stands
-(section 3.3.1).
+NVDA is done with the plugin. Both ways end in the same call, and both carry
+the same blocking: the menu stays reachable while a window of the add-on is
+open, so without it a second window would be opened from there over the first.
+The window itself is `guiwindow`'s, and it is modal like the other four — so
+while it stands, nothing here runs (section 3.3.1).
 
 **A checklist arrives two ways, and they are one operation.** Start-up reads
 the path out of `state.json`; the `O` key of the command mode asks the tester
@@ -725,11 +726,18 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 		self._mode.disarm()
 		self._show_window()
 
+	@blockAction.when(blockAction.Context.MODAL_DIALOG_OPEN)
 	def _on_menu_item(self, event: wx.CommandEvent) -> None:
 		"""The add-on was picked out of NVDA's Tools menu (section 5).
 
 		The other way to the same window, and it is the same call: which of the
 		two the tester used is not a difference the window is told about.
+
+		**Blocked like every script**, and for a reason the scripts do not have:
+		the menu of NVDA is still reachable while a window of the add-on stands,
+		so this is the one way a second window could be asked for. The decorator
+		is NVDA's own, so the refusal is spoken in NVDA's own words and the
+		add-on says nothing (section 3.3.1).
 		"""
 		self._show_window()
 
@@ -740,13 +748,66 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 		every command is given — the checklist in hand and where the tester
 		stands in it — so the node that opens selected is the item the next
 		command would be about. Both may be None, and neither is a refusal: the
-		window opens on an empty tree, and `guiwindow.activate` says why.
+		window opens on an empty tree, and `guiwindow.show` says why.
 
-		Nothing is remembered here. The window is looked at rather than moved
-		through, so the position it was handed is still the position when it
-		closes (section 5).
+		Nothing is remembered here, and the two callbacks are why nothing needs
+		to be: selecting in the tree is a view and moves no one (section 5), and
+		the two things that do change something come back out as calls. "Move
+		to" arrives once the window has closed, which is what makes `_move_to`
+		speak late; a save from the item dialog arrives while it still stands.
 		"""
-		guiwindow.activate(self._checklist, self._position)
+		guiwindow.show(self._checklist, self._position, self._move_to, self._save_from_window)
+
+	def _move_to(self, found: Position) -> None:
+		"""Stand where the window was asked to move to (section 5.1).
+
+		The one action of the window that moves the position, and it is an
+		ordinary move once it gets here: the position reaches `state.json` at
+		once and the item is spoken, exactly as after a navigation key.
+
+		Two things about it are the window's. The section is named, because
+		this is a jump and the most deliberate kind — the same reason it is
+		named after a double press and after a file has just been opened
+		(sections 3.1 and 3.2.2). And the phrase goes out late: the window has
+		just handed the focus back, and NVDA is about to announce the window
+		that took it (section 6).
+
+		`_standing` is not asked, and would answer the wrong question: what the
+		window handed back is a place in the checklist it was built from, and
+		nothing could have changed either while it stood.
+		"""
+		loaded = self._checklist
+		if loaded is None:
+			# Unreachable: a window with no checklist has an empty tree, and an
+			# empty tree has nowhere to move to.
+			log.error("the window asked for a move with no checklist open")
+			return
+		self._land(loaded, found, name_the_section=True, say=modal.message)
+
+	def _save_from_window(self, item: Item, status_value: str, comment: str) -> None:
+		"""Write what the item dialog collected, and let NVDA say what moved.
+
+		The far side of Enter on the tree (section 5.2). It is `_save_item`
+		with one thing taken away: the phrase naming what changed. The window
+		is still standing, and while it stands the add-on says nothing of its
+		own (section 5) — NVDA announcing the node of the tree with its new
+		prefix is the proof, and a second word over the top of it is noise.
+
+		What is left is what section 4 will not let go: a write that did not
+		reach the disk speaks, every time, and the end of a run speaks because
+		it is news about the run rather than about the window.
+
+		`self._checklist` rather than a checklist handed in: nothing can have
+		replaced it while the window stood, because every command is blocked
+		behind it (section 3.3.1).
+		"""
+		loaded = self._checklist
+		if loaded is None:
+			# Unreachable: the dialog is opened from a node of the tree, and a
+			# tree with nodes was built from a checklist.
+			log.error("the window saved an item with no checklist open")
+			return
+		self._save_item(loaded, item, status_value, comment, name_the_change=False)
 
 	def _choose_checklist(self) -> None:
 		"""Ask the tester which checklist to open (section 3.2.2).
@@ -888,28 +949,37 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 			return
 		self._land(loaded, found, name_the_section=jump)
 
-	def _land(self, loaded: Checklist, found: Position, name_the_section: bool = False) -> None:
+	def _land(
+		self,
+		loaded: Checklist,
+		found: Position,
+		name_the_section: bool = False,
+		say: Callable[[str], None] = ui.message,
+	) -> None:
 		"""Stand on `found`, put that on disk, and say what is there.
 
 		What every move of the position does, whoever made it: the navigation
-		keys (section 3.1) and auto-advance (section 4) both end here. The
-		order is the rule rather than the convenience — the position reaches
-		`state.json` **before** the item is spoken (sections 2 and 4), which is
-		the same order a change of data is held to and holds for the same
-		reason: the disk has stopped the keyboard either way, and all that is
-		chosen is where inside that pause the voice starts.
+		keys (section 3.1), auto-advance (section 4) and "Move to" in the
+		window (section 5.1) all end here. The order is the rule rather than
+		the convenience — the position reaches `state.json` **before** the item
+		is spoken (sections 2 and 4), which is the same order a change of data
+		is held to and holds for the same reason: the disk has stopped the
+		keyboard either way, and all that is chosen is where inside that pause
+		the voice starts.
 
-		`name_the_section` belongs to the jump between sections and to nothing
-		else (section 3.1): a step to the next item would be paying for a word
-		the tester already knows, on every press.
+		`name_the_section` belongs to a jump and to nothing else (section 3.1):
+		a step to the next item would be paying for a word the tester already
+		knows, on every press. `say` is how the phrase reaches them, as in
+		`_speak` and `_write`: `ui.message` from a command that runs with the
+		focus where it was, and `modal.message` from one that has just closed a
+		window (section 6).
 
 		Opening a checklist does not come through here, and that is not an
-		oversight: it moves the path as well as the position, and what it says
-		afterwards has to outlive a window closing (section 3.2.2).
+		oversight: it moves the path as well as the position (section 3.2.2).
 		"""
 		self._position = found
 		self._remember()
-		self._speak(loaded, found, name_the_section=name_the_section)
+		self._speak(loaded, found, name_the_section=name_the_section, say=say)
 
 	def _remember(self) -> None:
 		"""Put the position on disk, now (section 2).
@@ -1118,14 +1188,31 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 			return
 		self._land(loaded, found)
 
-	def _save_item(self, loaded: Checklist, item: Item, status_value: str, comment: str) -> None:
+	def _save_item(
+		self,
+		loaded: Checklist,
+		item: Item,
+		status_value: str,
+		comment: str,
+		name_the_change: bool = True,
+	) -> None:
 		"""Write what the item dialog was closed on, and say what moved (section 3.3.1).
 
-		The far side of the second press of `NVDA+Alt+I`. The window collected
-		a status and a comment and decided nothing about them; what they amount
-		to is one comparison, made before anything is written because all three
-		answers hang on it — whether to write at all, which words to speak, and
-		whether a status has just closed the last pending item of the run.
+		The far side of the second press of `NVDA+Alt+I`, and — with
+		`name_the_change` off — of Enter on the tree of the window (section
+		5.2). The window collected a status and a comment and decided nothing
+		about them; what they amount to is one comparison, made before anything
+		is written because all three answers hang on it — whether to write at
+		all, which words to speak, and whether a status has just closed the last
+		pending item of the run.
+
+		**`name_the_change` is who says what changed, not whether it is heard.**
+		From `NVDA+Alt+I` the add-on names it, because the focus goes back to
+		the application under test and nothing else would. From the tree the GUI
+		window is still standing and NVDA is about to announce the node with its
+		new prefix, so the add-on stays quiet and lets it (section 5). The rest
+		of the method does not move either way: the same comparison, the same
+		one write, the same end-of-run notice.
 
 		**A save that moved neither field is a save that does nothing**: no
 		file, no word, the same silence as Cancel. Writing anyway would buy
@@ -1156,7 +1243,8 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 			return
 		if not self._write(loaded, lambda: item.record(status_value, comment), say=modal.message):
 			return
-		modal.message(wording.spoken_save(change))
+		if name_the_change:
+			modal.message(wording.spoken_save(change))
 		if change.status is not None:
 			modal.later(lambda: self._announce_completion(loaded))
 

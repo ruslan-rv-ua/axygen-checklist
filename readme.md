@@ -35,7 +35,8 @@ takes a status and the run moves on to the next one by itself, the item dialog
 shows it in full and takes a comment, a fragment of an item goes to the
 clipboard, and the run says so when nothing is left unchecked. The window opens
 too, on the tree of the whole checklist and the comment of whatever is selected
-in it. What is missing sits around that core.
+in it; Enter on an item opens the item dialog there, and Ctrl+Enter moves the
+run to that item and closes the window. What is missing sits around that core.
 
 * **The rest of the window**: choosing a file in it, the auto-advance checkbox,
   and the button that resets the lot. Due in 0.1.0.
