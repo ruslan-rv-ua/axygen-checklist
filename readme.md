@@ -21,12 +21,29 @@ next to it and a block to paste into your project's `AGENTS.md`. Worth reading
 before letting an agent edit a checklist somebody has already run: the statuses
 and comments in the file are a tester's work, not the agent's to regenerate.
 
+Commands all sit under `NVDA+Alt`. `NVDA+Alt+O` arms a command mode for three
+seconds, and the key pressed after it does the work — `O` again opens a
+checklist file, which is where a first run starts. NVDA's own Input Gestures
+dialog lists every command of the add-on, each with a line on what it does,
+under the category **Axygen Checklist**.
+
 ## Not in this version yet
 
 This page describes the add-on as a whole, and not all of it is built yet.
+Walking a checklist works: a file opens, the commands move through it, an item
+takes a status, and the run says so when nothing is left unchecked. What is
+missing sits around that core.
 
-* **Walking a checklist at all.** This build only registers the add-on with
-  NVDA: no commands, no speech, no file handling. That arrives in 0.1.0.
+* **The item dialog, and with it comments.** An item reads back on demand, but
+  the window that shows it in full — and is the only place a comment is ever
+  written — does not open yet. Due in 0.1.0.
+* **Copying a fragment** — the exact string inside an item's text or note, an
+  address or a path or a command, the kind of thing worth pasting rather than
+  retyping from speech. Due in 0.1.0.
+* **Auto-advance**, which moves on to the next item once the current one has a
+  verdict. Until 0.1.0 every move is your own.
+* **The GUI window**: the tree of the whole checklist, the comment of the
+  selected item, and the button that resets the lot. Due in 0.1.0.
 * **Filtering to unchecked items** — due in 0.2.0.
 
 Until 1.0.0 the checklist file format and the set of commands may still change
