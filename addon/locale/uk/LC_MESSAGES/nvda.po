@@ -27,6 +27,12 @@ msgstr "Пункт чекліста"
 msgid "Item"
 msgstr "Пункт"
 
+#. Translators: The label of the read-only field of the item dialog holding the
+#. note the author of the checklist wrote about this item. The field is there
+#. only for an item that carries one.
+msgid "Note"
+msgstr "Нотатка"
+
 #. Translators: The label of the combo box of the item dialog, where the status of
 #. the checklist item is chosen.
 msgid "Status"
@@ -47,16 +53,6 @@ msgstr "&Зберегти"
 #. writing anything. Escape does the same.
 msgid "Cancel"
 msgstr "Скасувати"
-
-#. Translators: The label of the read-only field of the item dialog holding the note
-#. the author of the checklist wrote about this item.
-msgid "Note"
-msgstr "Нотатка"
-
-#. Translators: The label of the read-only field of the item dialog where the note would
-#. be, shown when the checklist item carries none. The field itself stays empty.
-msgid "No note"
-msgstr "Нотатка відсутня"
 
 # The product name is deliberately left in English in every locale: it is the name the
 # add-on carries in the Add-on Store, in the configuration directory and in its documentation.
@@ -297,8 +293,7 @@ msgstr ""
 msgid ""
 "Reads the current item of the checklist again. Twice: opens the item dialog"
 msgstr ""
-"Повторює озвучення поточного пункту чекліста. Двічі — відкриває діалог "
-"пункту"
+"Повторює озвучення поточного пункту чекліста. Двічі — відкриває діалог пункту"
 
 #. Translators: The description of a command, as it appears in NVDA's Input Gestures dialog.
 msgid "Arms the command mode of the checklist for three seconds"

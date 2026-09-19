@@ -17,22 +17,39 @@ every other change of data is settled, in the plugin and the core. So the
 rules of section 4 have one home rather than one per window, and nothing here
 touches a file.
 
-**The two read-only fields are single-line on purpose.** NVDA reads a dialog
-out on opening from the static text, the labels and the read-only edit fields
-that are **not** multi-line (`NVDAObjects.behaviors.Dialog.getDialogText`), so
-single-line is what puts the text of the item and the note in that description
-— heard at once, without a single Tab. The first press of the series cannot be
-leant on instead: the presses that follow cancel its speech, so by the time
-this window opens the tester has heard a few syllables of the item and no more.
-They are edit fields rather than static text for the other half of section
-3.3.1: a field can be walked with the arrows, selected through and copied out
-of, and static text cannot.
+**The two read-only fields are multi-line, and that is what makes them
+reachable.** wxWidgets leaves a single-line read-only text control out of the
+Tab chain — `AcceptsFocusFromKeyboard()` returns False for one, which is wx
+treating it as a caption rather than a control — while a multi-line read-only
+one stays in. Measured on wxWidgets 3.2.6, the build NVDA 2025.3 ships;
+`SetEditable(False)` in place of the style does the same thing.
+
+Section 3.3.1 weighed the two halves of itself and chose this one. Single-line
+bought the announcement: NVDA reads a dialog out on opening from the static
+text, the labels and the read-only edit fields that are **not** multi-line
+(`NVDAObjects.behaviors.Dialog.getDialogText`), so the item and the note were
+heard at once, without a single Tab. Multi-line buys what makes a field a
+field: Tab, the arrows, Shift+arrows and Ctrl+C. The cost is named rather than
+hidden — the description of the window now holds neither of them, and they are
+heard by walking to them. Neither is lost work: the text of the item is spoken
+on every landing on it (section 3.1) and the note with it (section 3.3).
 
 Their labels are the plain words of the specification and carry no mnemonic,
 so that each matches the accessible name of the field beneath it exactly.
 NVDA drops a label whose name is the name of the control after it, as the
 label it plainly is; a label that did not match would be read out as a word of
 its own (section 3.3.1).
+
+**An item with no note gets no note field**, rather than an empty one under a
+label saying so. That label was worth having while the fields were single-line
+and it was read out for free with the window; now it would cost a Tab press to
+be told nothing, and it would cost it on the way back to the item text, which
+runs past it — on most items, since most items carry no note. The tester knows
+the answer already: a note is spoken on every landing on its item (section
+3.3), so a field repeating it here repeats what was heard a moment ago. The
+price of this is a window whose shape varies, and section 3.3.1 takes it: NVDA
+names every control, so a different number of presses is not a place to get
+lost in.
 
 **The status is chosen, never typed.** `wx.CB_READONLY` makes arbitrary text
 structurally impossible, and section 3.3.1 wants it that way for a reason the
@@ -79,11 +96,12 @@ from .core.checklist import Item
 
 addonHandler.initTranslation()
 
-#: How wide the fields are drawn, and how tall the comment is, in pixels. A
+#: How wide the fields are drawn, and how tall each kind is, in pixels. A
 #: courtesy to whoever is looking at the screen rather than listening to it:
 #: nothing here is measured by the tester, and every field holds its whole
-#: value however narrow it is drawn. Unscaled, as in NVDA's own dialogs.
+#: value however small it is drawn. Unscaled, as in NVDA's own dialogs.
 _FIELD_WIDTH = 500
+_READ_ONLY_HEIGHT = 60
 _COMMENT_HEIGHT = 120
 
 
@@ -137,16 +155,23 @@ class _ItemDialog(wx.Dialog):
 			_("Item"),
 			wx.TextCtrl,
 			value=item.text,
-			style=wx.TE_READONLY,
-			size=(_FIELD_WIDTH, -1),
+			style=wx.TE_READONLY | wx.TE_MULTILINE,
+			size=(_FIELD_WIDTH, _READ_ONLY_HEIGHT),
 		)
-		contents.addLabeledControl(
-			_note_label(item),
-			wx.TextCtrl,
-			value=item.note or "",
-			style=wx.TE_READONLY,
-			size=(_FIELD_WIDTH, -1),
-		)
+		# The same test section 3.3 speaks a note by, and deliberately the same
+		# one: the field is there exactly when the note is heard on landing, so
+		# the add-on has one answer to "is there a note here" rather than two.
+		if item.note:
+			contents.addLabeledControl(
+				# Translators: The label of the read-only field of the item dialog holding the
+				# note the author of the checklist wrote about this item. The field is there
+				# only for an item that carries one.
+				_("Note"),
+				wx.TextCtrl,
+				value=item.note,
+				style=wx.TE_READONLY | wx.TE_MULTILINE,
+				size=(_FIELD_WIDTH, _READ_ONLY_HEIGHT),
+			)
 		self._status: wx.ComboBox = contents.addLabeledControl(
 			# Translators: The label of the combo box of the item dialog, where the status of
 			# the checklist item is chosen.
@@ -235,20 +260,3 @@ class _ItemDialog(wx.Dialog):
 		handler for the same rule read the other way — it *is* the escape id.
 		"""
 		self.EndModal(wx.ID_SAVE)
-
-
-def _note_label(item: Item) -> str:
-	"""The label of the note field, which says when there is no note to show.
-
-	Section 3.3.1: an item without a note keeps the field — the Tab order is
-	the same whatever the checklist holds — and the label is what carries the
-	absence, so that the description NVDA reads on opening says it in the one
-	place the note would have been.
-	"""
-	if item.note:
-		# Translators: The label of the read-only field of the item dialog holding the note
-		# the author of the checklist wrote about this item.
-		return _("Note")
-	# Translators: The label of the read-only field of the item dialog where the note would
-	# be, shown when the checklist item carries none. The field itself stays empty.
-	return _("No note")
