@@ -31,12 +31,10 @@ under the category **Axygen Checklist**.
 
 This page describes the add-on as a whole, and not all of it is built yet.
 Walking a checklist works: a file opens, the commands move through it, an item
-takes a status, and the run says so when nothing is left unchecked. What is
-missing sits around that core.
+takes a status, the item dialog shows it in full and takes a comment, and the
+run says so when nothing is left unchecked. What is missing sits around that
+core.
 
-* **The item dialog, and with it comments.** An item reads back on demand, but
-  the window that shows it in full — and is the only place a comment is ever
-  written — does not open yet. Due in 0.1.0.
 * **Copying a fragment** — the exact string inside an item's text or note, an
   address or a path or a command, the kind of thing worth pasting rather than
   retyping from speech. Due in 0.1.0.
