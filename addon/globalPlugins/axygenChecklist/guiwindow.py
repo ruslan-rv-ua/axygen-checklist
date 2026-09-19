@@ -35,11 +35,21 @@ from a tree (wx ticket #3725), which is the same hole NVDA patches the same
 way in its own Elements List. Ctrl+Enter presses "Move to", through the
 accelerator table, and that one closes the window.
 
+**"Reset all progress" is the window's own action**, and the only one that
+reaches every item at once (section 5). It asks first — the same confirmation
+the `R` key of the command mode asks about one section, in the same tone and
+parented on this window — and a Yes rebuilds the tree **whole** (section 5.3).
+Every label changed, so there is nothing in the old tree left worth keeping;
+that is the opposite of a save from the item dialog, which changes one label
+and must not cost the tester the expansion they made by hand.
+
 **The window collects, and it decides nothing.** Where the tester asked to be
 moved to comes back out of `show` as a `Position`; what a save from the item
-dialog amounts to goes straight out to `on_save`; and the file picked with
+dialog amounts to goes straight out to `on_save`; the file picked with
 `Browse...` goes out to `on_browse`, which answers with the checklist that is
-now open or with the reason it is not. Whether anything changed, what reaches
+now open or with the reason it is not; and a confirmed reset goes out to
+`on_reset`, which answers nothing, because what the tree shows afterwards is
+the checklist it was showing already. Whether anything changed, what reaches
 the file, what `state.json` gets and what is spoken are settled where every
 other change of data is settled, in the plugin and the core.
 
@@ -84,10 +94,11 @@ _window: "_ChecklistWindow | None" = None
 class Standing:
 	"""A checklist and the place in it the tester stands — what the tree is built from.
 
-	What `Browse...` gets back when a file opened (section 5.3). `position` is
-	None for a checklist there is nowhere to stand in, exactly as it is at the
-	door: section 2 asks a file for at least one section and never for a
-	minimum of items.
+	What `Browse...` gets back when a file opened (section 5.3), and what the
+	window keeps of whatever it is showing, so that a reset has something to
+	rebuild the tree from. `position` is None for a checklist there is nowhere
+	to stand in, exactly as it is at the door: section 2 asks a file for at
+	least one section and never for a minimum of items.
 
 	Where the tester stands after opening a file is not this window's to decide
 	— section 3.2.2 settles it, the same file landing where it was left and
@@ -112,6 +123,7 @@ def show(
 	on_move: Callable[[Position], None],
 	on_save: Callable[[Item, str, str], None],
 	on_browse: Callable[[Path], Browsed],
+	on_reset: Callable[[], None],
 ) -> None:
 	"""Open the window on `checklist`, standing on `position` (section 5).
 
@@ -141,13 +153,19 @@ def show(
 	sentence saying why it is not (section 5.3). Opening a file is a change of
 	data like any other and is settled where they all are; what comes back is
 	what the window has left to do about it, which is to show it.
+
+	`on_reset` is called once the tester has answered Yes to "Reset all
+	progress", and not before: the question is the window's to ask and the
+	erasing is not. It answers nothing — the checklist it just emptied is the
+	one the tree is built from either way — and says nothing either, unless the
+	write failed (sections 4 and 5.3).
 	"""
 
 	def build_and_hold(parent: wx.Window) -> "_ChecklistWindow":
 		# Named for the second half: the window is also put where `close` can
 		# reach it, which is the whole reason this module keeps a name at all.
 		global _window
-		_window = _ChecklistWindow(parent, checklist, position, on_save, on_browse)
+		_window = _ChecklistWindow(parent, checklist, position, on_save, on_browse, on_reset)
 		return _window
 
 	def answered(dialog: "_ChecklistWindow", answer: int) -> None:
@@ -229,7 +247,7 @@ class _Node:
 
 
 class _ChecklistWindow(wx.Dialog):
-	"""The window itself: the tree, the comment of what is selected, three buttons.
+	"""The window itself: the tree, the comment of what is selected, four buttons.
 
 	Built fresh on every way in and filled once, because there is no second
 	way in while it stands.
@@ -242,6 +260,7 @@ class _ChecklistWindow(wx.Dialog):
 		position: Position | None,
 		on_save: Callable[[Item, str, str], None],
 		on_browse: Callable[[Path], Browsed],
+		on_reset: Callable[[], None],
 	) -> None:
 		super().__init__(
 			parent,
@@ -254,9 +273,18 @@ class _ChecklistWindow(wx.Dialog):
 		#: what it does rather than after the button, because `_on_browse` — the
 		#: handler the button is bound to — has that name already.
 		self._open_file = on_browse
+		#: What the plugin does once a reset has been agreed to. Named as the
+		#: work rather than as the button, for the reason `_open_file` is.
+		self._erase_progress = on_reset
 		#: Where "Move to" was asked to go, and None until it is asked; see
 		#: `chosen_position`.
 		self._chosen: Position | None = None
+		#: The checklist on show and the place the tester stands in it, and None
+		#: when no checklist is open. Set wherever the tree is filled, which is
+		#: the only place either can change while the window stands, and read by
+		#: the reset, which has to build the same tree again from the far side
+		#: of a document every label of which has moved.
+		self._showing: Standing | None = None
 		# A dialog carries `wx.TAB_TRAVERSAL` itself, so there is no panel here
 		# and nothing to hold one: that panel existed only to give a frame the
 		# Tab walk it has not got (sections 5 and 6).
@@ -300,6 +328,14 @@ class _ChecklistWindow(wx.Dialog):
 			label=_("&Move to"),
 		)
 		self._move_to.Bind(wx.EVT_BUTTON, self._on_move_to)
+		self._reset_all: wx.Button = buttons.addButton(
+			self,
+			# Translators: The label of the button of the add-on's window that puts every item
+			# of the checklist back to not checked and erases every comment. The letter after
+			# the ampersand is the mnemonic that activates it.
+			label=_("&Reset all progress"),
+		)
+		self._reset_all.Bind(wx.EVT_BUTTON, self._on_reset)
 		buttons.addButton(
 			self,
 			id=wx.ID_CANCEL,
@@ -413,11 +449,22 @@ class _ChecklistWindow(wx.Dialog):
 		selection announces itself by the name of the control alone.
 
 		**The path field is filled here too**, which is what section 5 means by
-		filling it along with the tree: the two ways this runs are the two ways
-		a file becomes the one on show — the window opening, and a `Browse...`
-		that found a checklist. A file that was refused reaches neither, so
-		nothing in the window claims it (section 5.3).
+		filling it along with the tree: the three ways this runs are the three
+		ways a file becomes the one on show — the window opening, a `Browse...`
+		that found a checklist, and a reset, which shows the same file with
+		every label of it changed. A file that was refused reaches none of
+		them, so nothing in the window claims it (section 5.3).
+
+		**What is on show is written down here as well**, for the same reason
+		and in the same breath: this is the one place it can change while the
+		window stands, so a second place to keep it would be a second thing to
+		keep true. "Reset all progress" is what reads it, and it is what says
+		whether that button can be pressed at all — with no checklist open
+		there is nothing to erase, and an irreversible question about nothing
+		would cost more than a button that cannot be pressed (section 5).
 		"""
+		self._showing = None if checklist is None else Standing(checklist, position)
+		self._reset_all.Enable(self._showing is not None)
 		self._path.SetValue(
 			"" if checklist is None or checklist.path is None else str(checklist.path),
 		)
@@ -643,3 +690,60 @@ class _ChecklistWindow(wx.Dialog):
 			return
 		self._chosen = node.position
 		self.EndModal(wx.ID_OK)
+
+	def _on_reset(self, event: wx.CommandEvent) -> None:
+		"""Ask whether to erase the whole run, and erase it only on a Yes (section 5).
+
+		The same confirmation the `R` key asks about one section, in the same
+		tone and by the same mechanism — a warning, because this is an action
+		that loses recorded work for good, and Escape means No. What differs is
+		the parent: this one hangs off the window rather than off
+		`gui.mainFrame`, because the foreground already belongs to us (section
+		6), and `modal.confirm` holds the rest.
+
+		What is on show is read **now** and handed to the far side, rather than
+		read again once the answer comes back. Nothing can change it in
+		between — every command of the add-on is blocked behind this window,
+		and the window itself is blocked behind the question — so the two reads
+		would agree; one read is simply one fewer state to be sure of, and it
+		leaves the far side with nothing to check.
+		"""
+		showing = self._showing
+		if showing is None:
+			# Unreachable through the window: the button is disabled whenever
+			# no checklist is open.
+			log.error("a reset was asked for with no checklist open")
+			return
+		modal.confirm(
+			_(
+				# Translators: The question asked before the whole checklist is reset, that is
+				# every item of it put back to not checked and every comment erased.
+				"Reset all progress? Every status and comment will be erased. This cannot be undone.",
+			),
+			on_yes=lambda: self._confirmed(showing),
+			parent=self,
+		)
+
+	def _confirmed(self, showing: Standing) -> None:
+		"""The tester said Yes: let the plugin erase the run, then show what is left.
+
+		The tree is rebuilt **whole** (section 5.3), which is the one case
+		where a rebuild costs nothing: every label in it changed, so the
+		selection and the expansion are not being lost to save a label the way
+		they would be after a save from the item dialog (section 5.2). The
+		tester is left standing where they stood — a reset moves nobody — and
+		the panel and the path field follow the tree, as they do from any other
+		filling of it.
+
+		**Nothing is said**, here or from the plugin, unless the write failed:
+		while the window stands the add-on speaks only of failures (section
+		5.3). The accepted consequence is named in section 5: a reset made
+		while standing on an item that was already pending leaves no proof at
+		all, and the silence is what says it worked.
+
+		The tree is rebuilt whether or not the write got through. Section 4
+		leaves a failed change standing in memory, and the tree shows what is
+		in memory — the same rule the label of a saved item follows.
+		"""
+		self._erase_progress()
+		self._fill(showing.checklist, showing.position)

@@ -726,3 +726,14 @@ class TestResetting(OnDisk):
 		loaded = self.loaded("complete")
 		loaded.reset()
 		self.assertIn("$schema", self.on_disk(loaded))
+
+	def test_resetting_keeps_unknown_fields_at_every_level(self):
+		# A reset is the change with the most to erase — every item of every
+		# section — so the rule of section 2 is worth asking of it in full,
+		# and not only of the document it is written at the top of.
+		loaded = self.loaded("unknown-fields")
+		loaded.reset()
+		document = self.on_disk(loaded)
+		self.assertEqual(document["generated_by"], "an agent")
+		self.assertEqual(document["sections"][0]["severity"], "high")
+		self.assertEqual(document["sections"][0]["items"][0]["ticket"], "AX-42")

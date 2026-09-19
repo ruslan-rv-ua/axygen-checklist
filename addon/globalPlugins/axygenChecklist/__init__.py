@@ -763,6 +763,7 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 			self._move_to,
 			self._save_from_window,
 			self._browse,
+			self._reset_all,
 		)
 
 	def _browse(self, path: Path) -> guiwindow.Browsed:
@@ -841,6 +842,34 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 			log.error("the window saved an item with no checklist open")
 			return
 		self._save_item(loaded, item, status_value, comment, name_the_change=False)
+
+	def _reset_all(self) -> None:
+		"""Put every item of the checklist back to pending and erase every comment.
+
+		The far side of "Reset all progress" (section 5), and the twin of the
+		`R` key with one difference — how much it takes in. The erasing is the
+		same, the one write per command is the same, and so is the reason the
+		comments go with the statuses (section 3.2.2): a comment that outlived
+		a reset would be spoken over an item nobody has checked.
+
+		**Success says nothing**, and that is where the twins part. `R` leaves
+		the tester in the application under test, where nothing but the add-on
+		would speak; here the window is still standing, and while it stands the
+		add-on says nothing of its own (sections 5 and 5.3). A write that did
+		not reach the disk speaks all the same, as it does from everywhere
+		(section 4), and goes out late: the confirmation has just closed, and
+		NVDA is about to announce the window that took the focus back (section
+		6).
+
+		No end-of-run notice, and none possible: nothing in the checklist
+		carries a verdict any more.
+		"""
+		loaded = self._checklist
+		if loaded is None:
+			# Unreachable: the button is disabled whenever no checklist is open.
+			log.error("the window asked for a reset with no checklist open")
+			return
+		_ = self._write(loaded, loaded.reset, say=modal.message)
 
 	def _choose_checklist(self) -> None:
 		"""Ask the tester which checklist to open (section 3.2.2).

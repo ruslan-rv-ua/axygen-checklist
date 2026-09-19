@@ -7,7 +7,7 @@ msgstr ""
 "Project-Id-Version: 'axygenChecklist' '0.0.0'\n"
 "Report-Msgid-Bugs-To: 'https://github.com/ruslan-rv-ua/axygen-checklist/"
 "issues'\n"
-"POT-Creation-Date: 2026-09-19 13:40+0300\n"
+"POT-Creation-Date: 2026-09-19 20:06+0300\n"
 "PO-Revision-Date: 2026-09-16 20:04+0300\n"
 "Last-Translator: Ruslan Iskov <ruslan.rv.ua@gmail.com>\n"
 "Language-Team: Ukrainian\n"
@@ -82,6 +82,12 @@ msgstr "&Відкрити пункт"
 msgid "&Move to"
 msgstr "&Перейти до"
 
+#. Translators: The label of the button of the add-on's window that puts every item
+#. of the checklist back to not checked and erases every comment. The letter after
+#. the ampersand is the mnemonic that activates it.
+msgid "&Reset all progress"
+msgstr "&Скинути весь прогрес"
+
 #. Translators: The label of the button of the add-on's window that closes it.
 #. Escape does the same. The letter after the ampersand is the mnemonic that
 #. activates it.
@@ -98,6 +104,15 @@ msgstr "Файл чекліста"
 #. that browses for a path, so the Ukrainian catalogue has to repeat it too.
 msgid "Browse..."
 msgstr "Огляд..."
+
+#. Translators: The question asked before the whole checklist is reset, that is
+#. every item of it put back to not checked and every comment erased.
+msgid ""
+"Reset all progress? Every status and comment will be erased. This cannot be "
+"undone."
+msgstr ""
+"Скинути весь прогрес? Будуть стерті всі статуси та коментарі. Цю дію не "
+"можна відмінити."
 
 #. Translators: The title of the window that shows one checklist item in full and
 #. is the only place a comment is written.

@@ -33,14 +33,12 @@ itself only for a window without a parent, and a window without a parent is not
 one section 6 allows.
 
 **A window opened from another window of ours takes a `parent`, and `show`
-holds what that changes.** Three are so far, all from the GUI window (sections
-5 and 6): the item dialog reached from the tree, and the file dialog and the
-error of `Browse...`. Each hangs off that window instead, the pair above is not
-called at all and the series is not cleared: both are about coming in from
-somebody else's application, and these come in from ours. `show` says what each
-of the three changes is for. Section 6 counts a fourth, the confirmation before
-the whole run is reset; `confirm` takes no parent yet because that button is
-not built.
+holds what that changes.** There are four, all from the GUI window (sections 5
+and 6): the item dialog reached from the tree, the file dialog and the error of
+`Browse...`, and the confirmation before the whole run is reset. Each hangs off
+that window instead, the pair above is not called at all and the series is not
+cleared: both are about coming in from somebody else's application, and these
+come in from ours. `show` says what each of the three changes is for.
 
 **The series ends with the window** (section 6). `scriptHandler.clearLastScript()`
 is called on the way in, for every window a script opened and not only the item
@@ -249,7 +247,11 @@ def later(action: Callable[[], None]) -> None:
 	callLater(_A_TURN_OF_THE_LOOP, action)
 
 
-def confirm(question: str, on_yes: Callable[[], None]) -> None:
+def confirm(
+	question: str,
+	on_yes: Callable[[], None],
+	parent: wx.Window | None = None,
+) -> None:
 	"""Ask `question` with Yes and No, and run `on_yes` on Yes only.
 
 	The shape of every confirmation of the add-on. A warning, with the icon
@@ -265,11 +267,17 @@ def confirm(question: str, on_yes: Callable[[], None]) -> None:
 
 	No is answered with nothing at all: no change, no word, the same silence
 	as cancelling the item dialog (section 3.3.1).
+
+	`parent` is the GUI window when the question is "Reset all progress"
+	(section 5), and None when it is the `R` key asking about one section
+	(section 3.2.2). It goes straight to `show`, which holds what a parent of
+	our own changes; which of the two asked makes no difference to anything
+	else here, and the two questions differ only in how much they name.
 	"""
 
-	def create(parent: wx.Window) -> MessageDialog:
+	def create(owner: wx.Window) -> MessageDialog:
 		dialog = MessageDialog(
-			parent,
+			owner,
 			question,
 			_title(),
 			DialogType.WARNING,
@@ -281,7 +289,7 @@ def confirm(question: str, on_yes: Callable[[], None]) -> None:
 		if answer == ReturnCode.YES:
 			on_yes()
 
-	show(create, answered)
+	show(create, answered, parent)
 
 
 def choose_file(
