@@ -32,9 +32,19 @@ jobs:
       # The shell of the add-on resolves only against NVDA's own source, which is why
       # pyproject.toml excludes it from the default pyright configuration. wxPython, the
       # other thing the windows import, came in with `uv sync` above.
+      #
+      # Which NVDA that source is comes from `addon_lastTestedNVDAVersion` in buildVars.py,
+      # never from a number written here, which would drift away from the field that sets
+      # it. `tools/nvda_ref.py` does the mapping and says why the default branch is the
+      # wrong thing to check against. `bash` is here to fail fast: pwsh checks the exit
+      # code once, at the end of the script, so a clone that failed would carry on into
+      # pyright -- which reports unresolved imports and so fails for the wrong reason.
       - name: Type check the add-on against NVDA's source
+        shell: bash
         run: |
-          git clone --depth 1 https://github.com/nvaccess/nvda.git ../nvda
+          ref="$(uv run python -m tools.nvda_ref)"
+          echo "Checking against NVDA $ref"
+          git clone --depth 1 --branch "$ref" https://github.com/nvaccess/nvda.git ../nvda
           uv run pyright --project pyrightconfig.ci.json
 
       - name: Unit tests
