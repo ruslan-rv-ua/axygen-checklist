@@ -183,13 +183,24 @@ def message(text: str) -> None:
 def later(action: Callable[[], None]) -> None:
 	"""Do `action` on the same turn of the event loop `message` waits for.
 
-	`message`'s sibling, for what a window leaves behind that is not a phrase.
-	The end of a run is one such thing: section 4 has it *play a signal and
-	speak a message*, one event in one order, and `tones.beep` sounds the
-	moment it is called — so a run finished by a save from the item dialog
-	would sound its tone while the window was still closing, a whole window
-	announcement ahead of the words it belongs to. Handed to this, the pair
-	keeps together and keeps its place behind whatever `message` queued first.
+	`message`'s sibling, for a window's parting word that `message` cannot
+	carry on its own. Section 6 puts two kinds of thing here, and neither is a
+	bare phrase of the add-on's.
+
+	One is a phrase with something attached. The end of a run is that: section
+	4 has it *play a signal and speak a message*, one event in one order, and
+	`tones.beep` sounds the moment it is called — so a run finished by a save
+	from the item dialog would sound its tone while the window was still
+	closing, a whole window announcement ahead of the words it belongs to.
+	Handed to this, the pair keeps together and keeps its place behind
+	whatever `message` queued first.
+
+	The other is a phrase that is not the add-on's to hold. The confirmation
+	of a copy (section 3.2.2) is spoken from NVDA's own catalogue, inside
+	`api.copyToClip`, which says it through `ui.message`; there is no string
+	here to delay, so the call that makes it waits instead. Cancelling speech
+	does not ask whose line it is, which is why the rule reaches a phrase the
+	add-on never wrote.
 
 	The delay is the one `ui.delayedMessage` takes, and for the same reason: a
 	millisecond is not a wait for anything but a turn of the event loop, after

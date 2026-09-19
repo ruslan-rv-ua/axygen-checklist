@@ -31,13 +31,10 @@ under the category **Axygen Checklist**.
 
 This page describes the add-on as a whole, and not all of it is built yet.
 Walking a checklist works: a file opens, the commands move through it, an item
-takes a status, the item dialog shows it in full and takes a comment, and the
-run says so when nothing is left unchecked. What is missing sits around that
-core.
+takes a status, the item dialog shows it in full and takes a comment, a
+fragment of an item goes to the clipboard, and the run says so when nothing is
+left unchecked. What is missing sits around that core.
 
-* **Copying a fragment** — the exact string inside an item's text or note, an
-  address or a path or a command, the kind of thing worth pasting rather than
-  retyping from speech. Due in 0.1.0.
 * **Auto-advance**, which moves on to the next item once the current one has a
   verdict. Until 0.1.0 every move is your own.
 * **The GUI window**: the tree of the whole checklist, the comment of the

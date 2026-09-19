@@ -17,6 +17,28 @@ msgstr ""
 "Plural-Forms: nplurals=3; plural=(n%10==1 && n%100!=11 ? 0 : n%10>=2 && "
 "n%10<=4 && (n%100<10 || n%100>=20) ? 1 : 2);\n"
 
+#. Translators: The title of the window that lists the fragments of a checklist
+#. item so that one of them can be copied to the clipboard.
+msgid "Copy a fragment"
+msgstr "Копіювати фрагмент"
+
+#. Translators: The label of the list of the fragments of a checklist item, one
+#. of which is about to be copied to the clipboard.
+msgid "Fragments"
+msgstr "Фрагменти"
+
+#. Translators: The label of the button that puts the selected fragment of the
+#. checklist item in the clipboard. Enter on the list does the same.
+msgid "Copy"
+msgstr "Копіювати"
+
+#. Translators: The label of the button that closes the list of fragments without
+#. copying anything. Escape does the same.
+#. Translators: The label of the button of the item dialog that closes it without
+#. writing anything. Escape does the same.
+msgid "Cancel"
+msgstr "Скасувати"
+
 #. Translators: The title of the window that shows one checklist item in full and
 #. is the only place a comment is written.
 msgid "Checklist item"
@@ -48,11 +70,6 @@ msgstr "Коментар"
 #. mnemonic that activates it.
 msgid "&Save"
 msgstr "&Зберегти"
-
-#. Translators: The label of the button of the item dialog that closes it without
-#. writing anything. Escape does the same.
-msgid "Cancel"
-msgstr "Скасувати"
 
 # The product name is deliberately left in English in every locale: it is the name the
 # add-on carries in the Add-on Store, in the configuration directory and in its documentation.
@@ -323,6 +340,15 @@ msgid ""
 msgstr ""
 "Скинути розділ? Будуть стерті всі статуси та коментарі розділу. Цю дію не "
 "можна відмінити."
+
+#. Translators: The description of a command, as it appears in NVDA's Input Gestures dialog.
+msgid "Copies a fragment of the current checklist item to the clipboard"
+msgstr "Копіює фрагмент поточного пункту чекліста в буфер обміну"
+
+#. Translators: Spoken when the copy command is used on a checklist item whose
+#. text and note hold no fragments to copy.
+msgid "The item has no fragments"
+msgstr "У пункті немає фрагментів"
 
 #. Translators: Spoken when there is no section after this one to jump to.
 msgid "End of list"

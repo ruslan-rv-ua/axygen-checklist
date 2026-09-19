@@ -96,6 +96,7 @@ from collections.abc import Callable
 from pathlib import Path
 
 import addonHandler
+import api
 import globalPluginHandler
 import inputCore
 import NVDAState
@@ -111,7 +112,7 @@ from gui import blockAction
 from logHandler import log
 from scriptHandler import script
 
-from . import commandmode, itemdialog, modal, signals, wording
+from . import commandmode, fragmentsdialog, itemdialog, modal, signals, wording
 from .core import checklist, navigation, progress, session, status
 from .core.checklist import Checklist, Item, Section
 from .core.navigation import Direction, Position, Step
@@ -152,6 +153,7 @@ _DIGIT_STATUSES = {
 #: the currency the whole construction is bought with.
 _MODE_KEYS = {
 	**{identifier: "setStatus" for identifier in _DIGIT_STATUSES},
+	"kb:c": "copyFragment",
 	"kb:o": "openChecklist",
 	"kb:p": "speakSectionProgress",
 	"kb:r": "resetSection",
@@ -533,6 +535,44 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 			on_yes=lambda: self._reset_section(loaded, section),
 		)
 
+	@script(
+		description=_(
+			# Translators: The description of a command, as it appears in NVDA's Input Gestures dialog.
+			"Copies a fragment of the current checklist item to the clipboard",
+		),
+	)
+	@blockAction.when(blockAction.Context.MODAL_DIALOG_OPEN)
+	def script_copyFragment(self, gesture: inputCore.InputGesture) -> None:
+		# The `C` key of the command mode (section 3.2.2), and the one command of
+		# the add-on that answers three different ways depending on the data:
+		# none, one and many. All three are announced, so the tester never has to
+		# guess which one happened — a total rule that turns on the state of the
+		# data, as section 3.2.1 already has.
+		self._mode.disarm()
+		standing = self._standing()
+		if standing is None:
+			return
+		loaded, position = standing
+		found = navigation.item_at(loaded, position).fragments
+		if not found:
+			# Worded away from NVDA's own "Unable to copy", which the Ukrainian
+			# catalogue renders as "there is nothing to copy": without that, the
+			# two cases would be one phrase by ear (section 3.2.2).
+			ui.message(
+				# Translators: Spoken when the copy command is used on a checklist item whose
+				# text and note hold no fragments to copy.
+				_("The item has no fragments"),
+			)
+			return
+		if len(found) == 1:
+			# No window, and that is the point: there is nothing to choose
+			# between, and one would cost a change of focus and an Escape in the
+			# commonest case of all. The command runs from where the tester
+			# stands, so the confirmation is heard at once — unlike the one below.
+			self._copy(found[0])
+			return
+		fragmentsdialog.show(found, self._copy_later)
+
 	def _choose_checklist(self) -> None:
 		"""Ask the tester which checklist to open (section 3.2.2).
 
@@ -758,6 +798,41 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 		loaded, position = standing
 		section = navigation.section_at(loaded, position)
 		ui.message(wording.spoken_progress(section.name, progress.of(section.items)))
+
+	def _copy(self, fragment: str) -> None:
+		"""Put `fragment` in the clipboard, and let NVDA say how that went.
+
+		Section 3.2.2 hands the confirmation to `api.copyToClip(notify=True)`,
+		which checks the write by reading it back and answers out of **NVDA's**
+		catalogue rather than ours — the same wording the tester hears from
+		`NVDA+F10` and `NVDA+T`, and not one new string to translate. This is
+		the one exception section 4 makes to saying everything through
+		`ui.message`, and the return value is dropped with it: what became of
+		the write has already been spoken by the time it comes back.
+
+		Called outright when the item held a single fragment, and through
+		`modal.later` when the tester picked one out of the window. That delay
+		is section 6's rule read through what it is really about:
+		`api.copyToClip` speaks through `ui.message`, so a confirmation queued
+		the moment the window closed would be cut off by the foreground event of
+		the application under test getting the focus back. The phrase cannot be
+		held on its own — it belongs to NVDA and is born inside the call — so
+		the whole call waits the turn of the event loop, clipboard and all.
+		"""
+		_ = api.copyToClip(fragment, notify=True)
+
+	def _copy_later(self, fragment: str) -> None:
+		"""`_copy`, held for the turn of the event loop a closing window needs.
+
+		What the fragments dialog is answered with. The window has just handed
+		the focus back, and NVDA is about to announce the application that took
+		it; section 6 delays the whole call rather than the phrase inside it,
+		because the phrase belongs to NVDA's catalogue and is born within
+		`api.copyToClip`. Named rather than written as a lambda at the call
+		site so that the dialog is handed one plain callback, as the item
+		dialog is, and so that the delay has somewhere to be explained.
+		"""
+		modal.later(lambda: self._copy(fragment))
 
 	def _record_status(self, rule: Callable[[str], str]) -> None:
 		"""Give the current item the status `rule` makes of the one it holds.

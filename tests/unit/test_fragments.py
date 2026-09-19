@@ -10,6 +10,12 @@ import unittest
 
 from core import checklist, fragments
 
+from .support import REPO_ROOT
+
+#: The sample walked by hand to hear the `C` key of the command mode; see
+#: `TestTheSample` at the bottom of this module for what is asked of it.
+SAMPLE = REPO_ROOT / "samples" / "fragments-by-ear.json"
+
 
 def loaded(**fields: str) -> checklist.Checklist:
 	"""A checklist of one item carrying `fields`, read through the load pass."""
@@ -192,3 +198,28 @@ class TestValidation(unittest.TestCase):
 	def test_a_rewrite_leaves_the_delimiters_where_they_were(self):
 		written = checklist.dumps(loaded(text="Open `http://localhost:8080` now"))
 		self.assertIn('"text": "Open `http://localhost:8080` now"', written)
+
+
+class TestTheSample(unittest.TestCase):
+	"""`samples/fragments-by-ear.json` is the file the `C` key is heard on.
+
+	Section 3.2.2 answers with three different shapes depending on how many
+	fragments the item carries: a sentence for none, the clipboard for one, a
+	window for more. The sample exists so that all three can be walked in a
+	single run, and an edit that took the last item of one kind away -- a
+	backtick closed, a note reworded -- would leave the file perfectly valid
+	and quietly stop covering a third of the command. Nothing else would
+	notice, so the three kinds are counted here.
+	"""
+
+	def setUp(self):
+		self.counts = [len(item.fragments) for item in checklist.load(SAMPLE).items]
+
+	def test_an_item_answered_without_a_window_and_without_a_copy(self):
+		self.assertIn(0, self.counts)
+
+	def test_an_item_copied_at_once_without_a_window(self):
+		self.assertIn(1, self.counts)
+
+	def test_an_item_that_opens_the_dialog(self):
+		self.assertTrue([count for count in self.counts if count > 1])
