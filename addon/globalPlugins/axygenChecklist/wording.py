@@ -30,6 +30,12 @@ scanned down the page and the prefix filters it by ear from the first syllable;
 here there is only the one item, and its text matters more than the verdict on
 it.
 
+**What a save altered.** Section 3.3.1 speaks only what really moved, in the
+order status → comment, and the status half of that is the dictionary above —
+built anywhere else it would be a second wording of the same five words. Which
+of the two fields moved is not decided here but in the core (`Change`), because
+the same comparison decides whether anything is written at all.
+
 **Why a file was refused.** Section 2 wants one source of that text for the
 whole add-on, and sends it to two places. The short spoken form goes wherever a
 checklist loaded without anyone asking — at start-up, from `state.json`. The
@@ -56,7 +62,7 @@ import json
 import addonHandler
 
 from .core import status
-from .core.checklist import Item, Problem, ProblemKind
+from .core.checklist import Change, CommentChange, Item, Problem, ProblemKind
 from .core.progress import Progress
 
 addonHandler.initTranslation()
@@ -125,6 +131,43 @@ def spoken_item(item: Item, section_name: str | None = None) -> str:
 	if section_name is not None:
 		sentences.insert(0, section_name)
 	return ". ".join(sentences)
+
+
+def spoken_save(change: Change) -> str:
+	"""What the tester hears after a save from the item dialog (section 3.3.1).
+
+	Only what really moved, in the order status → comment: *"failed, comment
+	saved"*, *"failed"*, *"comment saved"* or *"comment deleted"*. A save that
+	moved neither field never reaches here — section 3.3.1 answers that one
+	with the silence of a cancel, and with no write either.
+
+	The status word is the dictionary's, as everywhere (section 2). The clause
+	about the comment says only that there is one now, or that there is not:
+	the text itself was on the screen the tester has just closed, and reading
+	their own paragraph back to them is what section 3.3 refuses to do
+	anywhere.
+
+	The words are lowercase because the phrase is built out of them in either
+	order, and the status word is lowercase in the dictionary; the capital in
+	the specification is the first letter of a sentence quoted there, as it is
+	wherever a single status word is quoted.
+	"""
+	spoken: list[str] = []
+	if change.status is not None:
+		spoken.append(status_word(change.status))
+	match change.comment:
+		case CommentChange.SAVED:
+			# Translators: Spoken after a save from the item dialog that left a comment on the
+			# item. The status word goes in front of it when that changed too, running straight
+			# on: "failed, comment saved".
+			spoken.append(_("comment saved"))
+		case CommentChange.DELETED:
+			# Translators: Spoken after a save from the item dialog emptied a comment the item
+			# was carrying.
+			spoken.append(_("comment deleted"))
+		case CommentChange.UNCHANGED:
+			pass
+	return ", ".join(spoken)
 
 
 def spoken_refusal(problem: Problem | None = None) -> str:

@@ -44,7 +44,10 @@ change only after the code of the add-on has had its say: the foreground event
 cancels speech, so a phrase queued at once would be cut off by the announcement
 of the window that got the focus back. `message` below goes through
 `ui.delayedMessage`, which holds a phrase for a short moment of NVDA's own — the
-same move NVDA makes when it refuses a blocked action.
+same move NVDA makes when it refuses a blocked action. `later` holds anything
+else for that same moment, and exists because a tone is not a phrase and would
+otherwise be heard a whole window announcement ahead of the words it belongs
+to.
 
 **The window is destroyed here**, after whoever asked for it has read what they
 need out of it. A `wx.Dialog` shown modally is not destroyed by being closed,
@@ -73,6 +76,12 @@ import gui
 import scriptHandler
 import ui
 import wx
+
+# NVDA's own `core`, which shares a name with the add-on's `core` package. The
+# two never collide — one is imported absolutely and the other relatively —
+# but `core` in the body of this module would mean whichever the reader
+# guessed, so the one name needed is taken out of it instead.
+from core import callLater
 from gui.message import DefaultButtonSet, DialogType, MessageDialog, ReturnCode, displayDialogAsModal
 from logHandler import log
 
@@ -81,6 +90,10 @@ addonHandler.initTranslation()
 #: The window a caller of `show` builds, handed back to them with its answer
 #: as the type they built rather than as a bare `wx.Dialog`.
 DialogT = TypeVar("DialogT", bound=wx.Dialog)
+
+#: How long `later` holds an action, in milliseconds; see it for why the
+#: number is here rather than taken from NVDA by name.
+_A_TURN_OF_THE_LOOP = 1
 
 
 def _title() -> str:
@@ -165,6 +178,26 @@ def message(text: str) -> None:
 	the one phrase of a failed write — comes through here.
 	"""
 	ui.delayedMessage(text)
+
+
+def later(action: Callable[[], None]) -> None:
+	"""Do `action` on the same turn of the event loop `message` waits for.
+
+	`message`'s sibling, for what a window leaves behind that is not a phrase.
+	The end of a run is one such thing: section 4 has it *play a signal and
+	speak a message*, one event in one order, and `tones.beep` sounds the
+	moment it is called — so a run finished by a save from the item dialog
+	would sound its tone while the window was still closing, a whole window
+	announcement ahead of the words it belongs to. Handed to this, the pair
+	keeps together and keeps its place behind whatever `message` queued first.
+
+	The delay is the one `ui.delayedMessage` takes, and for the same reason: a
+	millisecond is not a wait for anything but a turn of the event loop, after
+	which the foreground event of the window that got the focus back has
+	already done its cancelling. NVDA keeps the number in a private constant of
+	`ui`, so it stands here as a number rather than as a name.
+	"""
+	callLater(_A_TURN_OF_THE_LOOP, action)
 
 
 def confirm(question: str, on_yes: Callable[[], None]) -> None:

@@ -21,7 +21,7 @@ from pathlib import Path
 from typing import Any
 from unittest import mock
 
-from core import checklist, status
+from core import checklist, disk, status
 
 from .support import fixture_names, fixture_text, temporary_directory
 
@@ -523,19 +523,40 @@ class TestRecordingAChange(OnDisk):
 
 	def test_a_comment_reaches_the_file_at_once(self):
 		loaded = self.loaded()
-		loaded.sections[0].items[0].record_comment("Slow, but it works")
+		loaded.sections[0].items[0].record(status.PENDING, "Slow, but it works")
 		self.assertEqual(self.on_disk(loaded)["sections"][0]["items"][0]["comment"], "Slow, but it works")
 
 	def test_a_blank_comment_never_reaches_the_file(self):
 		loaded = self.loaded()
-		loaded.sections[0].items[0].record_comment("   ")
+		loaded.sections[0].items[0].record(status.PENDING, "   ")
 		self.assertNotIn("comment", self.on_disk(loaded)["sections"][0]["items"][0])
 		self.assertIsNone(loaded.sections[0].items[0].comment)
 
 	def test_erasing_a_comment_takes_it_out_of_the_file(self):
 		loaded = self.loaded("complete")
-		loaded.sections[0].items[2].record_comment(None)
+		loaded.sections[0].items[2].record(status.FAILED, None)
 		self.assertNotIn("comment", self.on_disk(loaded)["sections"][0]["items"][2])
+
+	def test_a_save_of_both_fields_writes_the_file_once(self):
+		# Section 3.3.1: the Save button of the item dialog is one command, so
+		# it is one rewrite of the file rather than one per field. Of two
+		# writes the second may fail, which would leave the disk holding half
+		# of a change section 4 then says nothing at all about.
+		loaded = self.loaded()
+		with mock.patch("core.disk.write", wraps=disk.write) as written:
+			loaded.sections[0].items[0].record(status.FAILED, "Phone has no label")
+		self.assertEqual(written.call_count, 1)
+		item = self.on_disk(loaded)["sections"][0]["items"][0]
+		self.assertEqual(item["status"], "failed")
+		self.assertEqual(item["comment"], "Phone has no label")
+
+	def test_a_save_with_a_status_outside_the_five_writes_nothing_at_all(self):
+		# Not even the comment, which is the half that would otherwise reach
+		# the disk before the status was looked at.
+		loaded = self.loaded()
+		with self.assertRaises(ValueError):
+			loaded.sections[0].items[0].record("done", "Phone has no label")
+		self.assertNotIn("comment", self.on_disk(loaded)["sections"][0]["items"][0])
 
 	def test_a_change_keeps_what_the_add_on_knows_nothing_about(self):
 		# The rule this ticket exists for. Without it the first press of the
@@ -570,7 +591,7 @@ class TestRecordingAChange(OnDisk):
 
 	def test_the_file_is_written_as_utf8(self):
 		loaded = self.loaded()
-		loaded.sections[0].items[0].record_comment("Кирилиця")
+		loaded.sections[0].items[0].record(status.PENDING, "Кирилиця")
 		assert loaded.path is not None
 		self.assertIn("Кирилиця".encode(), loaded.path.read_bytes())
 
@@ -602,6 +623,67 @@ class TestRecordingAChange(OnDisk):
 		self.assertIsNone(loaded.path)
 		with self.assertRaises(ValueError):
 			loaded.sections[0].items[0].record_status(status.PASSED)
+
+
+class TestWhatASaveChanges(unittest.TestCase):
+	"""Section 3.3.1: a save speaks only what really changed, and nothing else.
+
+	The same comparison answers three questions — whether to write at all,
+	which words to say, and whether a status has just closed the last pending
+	item — so it is made once and asked here on its own. Nothing is written by
+	any of this: the question comes before the write.
+	"""
+
+	def item(self, name: str = "complete", index: int = 0) -> checklist.Item:
+		"""One item of the valid fixture `name`, read from text and unwritable."""
+		return checklist.loads(fixture_text("valid", name)).sections[0].items[index]
+
+	def test_a_save_that_moved_neither_field_changes_nothing(self):
+		# The Save button doing what Cancel does: no file, no word.
+		item = self.item()
+		change = checklist.Change.of(item, status.PASSED, None)
+		self.assertFalse(change.anything)
+		self.assertIsNone(change.status)
+		self.assertIs(change.comment, checklist.CommentChange.UNCHANGED)
+
+	def test_a_status_that_moved_is_the_status_to_write(self):
+		change = checklist.Change.of(self.item(), status.BLOCKED, None)
+		self.assertEqual(change.status, status.BLOCKED)
+		self.assertIs(change.comment, checklist.CommentChange.UNCHANGED)
+		self.assertTrue(change.anything)
+
+	def test_a_comment_where_there_was_none_is_saved(self):
+		change = checklist.Change.of(self.item(), status.PASSED, "Slow, but it works")
+		self.assertIsNone(change.status)
+		self.assertIs(change.comment, checklist.CommentChange.SAVED)
+
+	def test_a_comment_written_over_is_saved(self):
+		change = checklist.Change.of(self.item(index=2), status.FAILED, "No label on Phone either")
+		self.assertIs(change.comment, checklist.CommentChange.SAVED)
+
+	def test_a_comment_emptied_is_deleted(self):
+		change = checklist.Change.of(self.item(index=2), status.FAILED, "")
+		self.assertIs(change.comment, checklist.CommentChange.DELETED)
+		self.assertTrue(change.anything)
+
+	def test_a_comment_left_holding_spaces_is_deleted_too(self):
+		# Section 2 has "no comment" and "an empty comment" as one state, and
+		# whitespace is that state as much as an empty string is.
+		change = checklist.Change.of(self.item(index=2), status.FAILED, "   ")
+		self.assertIs(change.comment, checklist.CommentChange.DELETED)
+
+	def test_spaces_typed_where_there_was_no_comment_are_no_change(self):
+		# The other side of the same rule: nothing was deleted, because there
+		# was nothing there. A save of this alone says nothing and writes
+		# nothing.
+		change = checklist.Change.of(self.item(), status.PASSED, "  \n ")
+		self.assertIs(change.comment, checklist.CommentChange.UNCHANGED)
+		self.assertFalse(change.anything)
+
+	def test_both_fields_move_at_once(self):
+		change = checklist.Change.of(self.item(), status.FAILED, "Nothing is announced")
+		self.assertEqual(change.status, status.FAILED)
+		self.assertIs(change.comment, checklist.CommentChange.SAVED)
 
 
 class TestResetting(OnDisk):

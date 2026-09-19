@@ -15,8 +15,8 @@ load beats silence an hour into the run.
 **There is no `save`.** Section 2 has every change to the data rewrite the
 whole file at once, with no exceptions and no discipline anywhere about when
 the file reaches the disk — so the change and the write are one operation
-(`record_status`, `record_comment`, `reset`), and nothing here offers a way to
-make the first without the second. A `save()` the shell had to remember to call
+(`record_status`, `record`, `reset`), and nothing here offers a way to make the
+first without the second. A `save()` the shell had to remember to call
 would be that discipline, and the deferred write it invites is what section 2
 paid off when the double press of the space bar went away.
 
@@ -194,6 +194,33 @@ class Item:
 	def record_status(self, value: str) -> None:
 		"""Give the item this status and rewrite the file at once (section 2).
 
+		The two ways a status is assigned without a window — the quick toggle
+		and the digits of the command mode (section 3.2) — leave the comment
+		exactly as they found it, which is what tells this apart from `record`.
+		"""
+		self._set_status(value)
+		self._rewrite()
+
+	def record(self, status_value: str, comment: str | None) -> None:
+		"""Give the item this status and this comment, and rewrite the file once.
+
+		What a save from the item dialog does (section 3.3.1). Both fields
+		travel together because the Save button is one command, and section
+		3.3.1 makes one save one rewrite of the file rather than one per field
+		— the same rule a reset of a section is held to, and for a sharper
+		reason: of two writes the second may fail, which would leave the disk
+		holding half of a change section 4 then says nothing at all about.
+
+		`comment` is normalised on the way in, as everywhere else: a blank one
+		and an absent one are the same state (section 2).
+		"""
+		self._set_status(status_value)
+		_set_comment(self._data, comment)
+		self._rewrite()
+
+	def _set_status(self, value: str) -> None:
+		"""Put `value` in the status of the item, without writing.
+
 		A value outside the five is a programming error rather than a refusal.
 		Nothing in the shell can produce one — the combo box of the item dialog
 		is read-only precisely so that a typo cannot (section 3.3.1) — and
@@ -203,17 +230,6 @@ class Item:
 		if value not in status.STATUSES:
 			raise ValueError(f"not a status of the format: {value!r}")
 		self._data["status"] = value
-		self._rewrite()
-
-	def record_comment(self, value: str | None) -> None:
-		"""Give the item this comment and rewrite the file at once (section 2).
-
-		`None` erases it, and so does a comment that is empty or nothing but
-		whitespace: section 2 has one state there, and `_text` is the one place
-		that decides what counts as a comment at all.
-		"""
-		_set_comment(self._data, value)
-		self._rewrite()
 
 
 class Section:
@@ -336,6 +352,73 @@ class Checklist:
 		# and a crash inside that window would leave a stump where the texts
 		# and the notes had been, not just the run (section 2).
 		disk.write(self._path, dumps(self))
+
+
+class CommentChange(enum.Enum):
+	"""What a save did to the comment of an item (section 3.3.1).
+
+	Three outcomes rather than a pair of strings to compare, because three is
+	what the tester hears: nothing at all, *"comment saved"* or *"comment
+	deleted"*. Which of them a pair of strings amounts to is settled once, here
+	— where the rule that a blank comment is no comment already lives — rather
+	than in the window that collected them.
+	"""
+
+	#: The comment is the one that was already there.
+	UNCHANGED = enum.auto()
+	#: The item now carries a comment it did not carry, or a different one.
+	SAVED = enum.auto()
+	#: The item carried a comment and carries none now.
+	DELETED = enum.auto()
+
+
+@dataclasses.dataclass(frozen=True)
+class Change:
+	"""What saving the item dialog would alter, and nothing it leaves alone.
+
+	Section 3.3.1 speaks only what really changed, stays silent and writes
+	nothing when nothing did, and ends the run only when a **status** closed
+	the last pending item. All three questions are asked of the one comparison,
+	so the comparison is made once and carried about as this.
+	"""
+
+	#: The status to write, and None when it is the one standing there already.
+	status: str | None
+	comment: CommentChange
+
+	@classmethod
+	def of(cls, item: Item, status_value: str, comment: str | None) -> "Change":
+		"""What giving `item` this status and this comment would alter.
+
+		Nothing is written and nothing on the item moves: this is the question
+		asked *before* the write, because a save that changes nothing writes
+		nothing (section 3.3.1).
+
+		The comment is measured after the normalisation of section 2, so a
+		field the tester only put spaces into is not a change, and emptying one
+		that held only spaces is not a deletion — both were already no comment.
+		"""
+		after = _text(comment)
+		return cls(
+			status=status_value if status_value != item.status else None,
+			comment=_comment_change(item.comment, after),
+		)
+
+	@property
+	def anything(self) -> bool:
+		"""Whether the save alters anything at all.
+
+		False is a Save that does what Cancel does: nothing written and nothing
+		said (section 3.3.1).
+		"""
+		return self.status is not None or self.comment is not CommentChange.UNCHANGED
+
+
+def _comment_change(before: str | None, after: str | None) -> CommentChange:
+	"""Which of the three things happened between these two comments."""
+	if after == before:
+		return CommentChange.UNCHANGED
+	return CommentChange.DELETED if after is None else CommentChange.SAVED
 
 
 def dumps(checklist: Checklist) -> str:

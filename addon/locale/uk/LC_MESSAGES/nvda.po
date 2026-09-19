@@ -17,6 +17,43 @@ msgstr ""
 "Plural-Forms: nplurals=3; plural=(n%10==1 && n%100!=11 ? 0 : n%10>=2 && "
 "n%10<=4 && (n%100<10 || n%100>=20) ? 1 : 2);\n"
 
+#. Translators: The title of the window that shows one checklist item in full and
+#. is the only place a comment is written.
+msgid "Checklist item"
+msgstr "Пункт чекліста"
+
+#. Translators: The label of the read-only field of the item dialog holding the
+#. whole text of the checklist item.
+msgid "Item"
+msgstr "Пункт"
+
+#. Translators: The label of the read-only field of the item dialog holding the
+#. note the author of the checklist wrote about this item. The field is there
+#. only for an item that carries one.
+msgid "Note"
+msgstr "Нотатка"
+
+#. Translators: The label of the combo box of the item dialog, where the status of
+#. the checklist item is chosen.
+msgid "Status"
+msgstr "Статус"
+
+#. Translators: The label of the editable field of the item dialog, where the tester
+#. writes their conclusion about the checklist item.
+msgid "Comment"
+msgstr "Коментар"
+
+#. Translators: The label of the button of the item dialog that writes the status
+#. and the comment to the checklist file. The letter after the ampersand is the
+#. mnemonic that activates it.
+msgid "&Save"
+msgstr "&Зберегти"
+
+#. Translators: The label of the button of the item dialog that closes it without
+#. writing anything. Escape does the same.
+msgid "Cancel"
+msgstr "Скасувати"
+
 # The product name is deliberately left in English in every locale: it is the name the
 # add-on carries in the Add-on Store, in the configuration directory and in its documentation.
 #. Translators: The title of the add-on's windows: the product name, which is
@@ -69,6 +106,17 @@ msgstr "не перевірено"
 #. commented on. The comment itself is not spoken; the item dialog shows it.
 msgid "has a comment"
 msgstr "є коментар"
+
+#. Translators: Spoken after a save from the item dialog that left a comment on the
+#. item. The status word goes in front of it when that changed too, running straight
+#. on: "failed, comment saved".
+msgid "comment saved"
+msgstr "коментар збережено"
+
+#. Translators: Spoken after a save from the item dialog emptied a comment the item
+#. was carrying.
+msgid "comment deleted"
+msgstr "коментар видалено"
 
 #. Translators: Spoken when a checklist file was written by a newer version of
 #. the add-on than the one running, which cannot know what is in it.
@@ -242,8 +290,10 @@ msgstr ""
 "перевірено»"
 
 #. Translators: The description of a command, as it appears in NVDA's Input Gestures dialog.
-msgid "Reads the current item of the checklist again"
-msgstr "Повторює озвучення поточного пункту чекліста"
+msgid ""
+"Reads the current item of the checklist again. Twice: opens the item dialog"
+msgstr ""
+"Повторює озвучення поточного пункту чекліста. Двічі — відкриває діалог пункту"
 
 #. Translators: The description of a command, as it appears in NVDA's Input Gestures dialog.
 msgid "Arms the command mode of the checklist for three seconds"

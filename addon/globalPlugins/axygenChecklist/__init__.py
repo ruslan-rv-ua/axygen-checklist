@@ -111,9 +111,9 @@ from gui import blockAction
 from logHandler import log
 from scriptHandler import script
 
-from . import commandmode, modal, signals, wording
+from . import commandmode, itemdialog, modal, signals, wording
 from .core import checklist, navigation, progress, session, status
-from .core.checklist import Checklist, Section
+from .core.checklist import Checklist, Item, Section
 from .core.navigation import Direction, Position, Step
 from .core.session import Session
 
@@ -384,24 +384,36 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 	@script(
 		description=_(
 			# Translators: The description of a command, as it appears in NVDA's Input Gestures dialog.
-			"Reads the current item of the checklist again",
+			"Reads the current item of the checklist again. Twice: opens the item dialog",
 		),
 		gesture="kb:NVDA+alt+i",
 	)
 	@blockAction.when(blockAction.Context.MODAL_DIALOG_OPEN)
 	def script_readItem(self, gesture: inputCore.InputGesture) -> None:
 		self._mode.disarm()
-		# Every press reads the item, the second one included. Section 3.3 gives
-		# the second press the item dialog, which is not built yet, and the one
-		# thing this may not do meanwhile is fall silent: NVDA cancels speech on
-		# a keypress, so a second press that did nothing would cut the first one
-		# off mid-word and leave the tester with a syllable and no explanation —
-		# indistinguishable, at the keyboard, from an add-on that has crashed.
 		standing = self._standing()
 		if standing is None:
 			return
 		loaded, position = standing
-		self._speak(loaded, position)
+		if scriptHandler.getLastScriptRepeatCount() == 0:
+			self._speak(loaded, position)
+			return
+		# The second press, and the heavy end of the series (section 3.3): the
+		# window may not open on the first, which would take the focus and put
+		# the second press out of reach (section 6). What the first press said
+		# is cut off by this one, as any keypress cancels speech — which is why
+		# the dialog puts the text of the item and the note in the description
+		# NVDA reads on opening rather than leaving them to that first press
+		# (section 3.3.1).
+		#
+		# There is no third press to answer: the window is modal, so every
+		# command of the add-on is blocked behind it, and `modal.show` clears
+		# the series besides (section 3.3.1).
+		item = navigation.item_at(loaded, position)
+		itemdialog.show(
+			item,
+			lambda status_value, comment: self._save_item(loaded, item, status_value, comment),
+		)
 
 	@script(
 		description=_(
@@ -777,6 +789,48 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 		ui.message(wording.status_word(item.status))
 		self._announce_completion(loaded)
 
+	def _save_item(self, loaded: Checklist, item: Item, status_value: str, comment: str) -> None:
+		"""Write what the item dialog was closed on, and say what moved (section 3.3.1).
+
+		The far side of the second press of `NVDA+Alt+I`. The window collected
+		a status and a comment and decided nothing about them; what they amount
+		to is one comparison, made before anything is written because all three
+		answers hang on it — whether to write at all, which words to speak, and
+		whether a status has just closed the last pending item of the run.
+
+		**A save that moved neither field is a save that does nothing**: no
+		file, no word, the same silence as Cancel. Writing anyway would buy
+		exactly one thing — the chance to hear *"Error writing the file"* for a
+		command that changed nothing (section 3.3.1).
+
+		The status and the comment go into the document together and reach the
+		disk in one rewrite, which is `Item.record`'s doing; here it matters
+		only that the phrase comes after the write, as section 4 has it for
+		every command that changes data.
+
+		Everything spoken goes out late: the window has just handed the focus
+		back, and NVDA is about to announce the window that took it, so a
+		phrase queued at once would be cut off by it (section 6). The end of a
+		run goes through `modal.later` rather than `modal.message` because it
+		is a tone **and** a phrase, and delaying only the phrase would leave
+		the tone sounding a window announcement ahead of it.
+
+		**No auto-advance** (section 4): the dialog is a deliberate stop on one
+		item, and moving the position quietly behind a closing window would
+		leave the next command describing a different item than the one just
+		edited. The end-of-run notice is the opposite case and is given — but
+		only when the **status** moved, because a comment added to a checklist
+		that had nothing pending before it closed nothing.
+		"""
+		change = checklist.Change.of(item, status_value, comment)
+		if not change.anything:
+			return
+		if not self._write(loaded, lambda: item.record(status_value, comment), say=modal.message):
+			return
+		modal.message(wording.spoken_save(change))
+		if change.status is not None:
+			modal.later(lambda: self._announce_completion(loaded))
+
 	def _reset_section(self, loaded: Checklist, section: Section) -> None:
 		"""Put every item of `section` back to pending, erase its comments, say so.
 
@@ -861,6 +915,12 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 		costs both rules it would break: section 4 sends every message through
 		`ui.message`, and `signals` is the only module that touches `tones`, so
 		that the four signals can be picked to differ from one another.
+
+		**The tone is why this takes no `say` of its own**, unlike everything
+		else the add-on speaks. A save from the item dialog cannot delay the
+		phrase and leave the tone where it was — that would part the two by a
+		whole window announcement — so the caller delays the pair instead, with
+		`modal.later`, and what happens inside here is the same either way.
 		"""
 		counted = progress.of(loaded.items)
 		if not counted.finished:

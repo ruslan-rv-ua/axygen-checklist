@@ -12,10 +12,7 @@
 	// it is raised together with that field. docs/development.md, "Перевірки перед
 	// комітом", lists the three things that move as one.
 	"pythonVersion": "3.11",
-	// tests/typecheck holds the probe that keeps `import wx` resolvable: until the first
-	// window lands, nothing in addon/ imports wx, and nothing else would notice the types
-	// going missing.
-	"include": ["addon", "tests/typecheck"],
+	"include": ["addon"],
 	"extraPaths": ["./addon", "../nvda/source"],
 	"venvPath": ".venv",
 	"venv": ".",
