@@ -107,7 +107,9 @@ def show(
 	handed the item and the pair the dialog collected (section 5.2).
 	"""
 
-	def create(parent: wx.Window) -> "_ChecklistWindow":
+	def build_and_hold(parent: wx.Window) -> "_ChecklistWindow":
+		# Named for the second half: the window is also put where `close` can
+		# reach it, which is the whole reason this module keeps a name at all.
 		global _window
 		_window = _ChecklistWindow(parent, checklist, position, on_save)
 		return _window
@@ -120,7 +122,7 @@ def show(
 		if answer == wx.ID_OK and dialog.chosen_position is not None:
 			on_move(dialog.chosen_position)
 
-	modal.show(create, answered)
+	modal.show(build_and_hold, answered)
 
 
 def close() -> None:
@@ -135,6 +137,17 @@ def close() -> None:
 	**Ending the loop as a cancel is the whole of it.** `show` answers a cancel
 	by doing nothing, so nothing is written, nothing is spoken and no position
 	moves — which is what "NVDA is done with us" should amount to.
+
+	**With the item dialog open on top, the loop ended here is not the topmost
+	one**, and that is traced rather than guarded. The reload can arrive while
+	a save is being written, and then: this sets the outer dialog's flag, the
+	inner loop goes on, and a Save reaches the old plugin's callback. The
+	checklist object it writes through is the same document the new plugin will
+	read, so the file gets what the tester asked for; the tree is still alive,
+	because `modal` destroys the window only once the outer loop has actually
+	returned, so the label update lands as usual; and the window then closes as
+	a cancel. Machinery to close the inner window first would buy nothing that
+	this does not already do.
 
 	**The reference goes before the window does**, and the ending is guarded.
 	On the way out of NVDA the main frame is torn down first, and a child of it
@@ -162,11 +175,14 @@ class _Node:
 	what the two buttons ask about (section 5.1).
 
 	`position` is where "Move to" would take the tester. For an item it is that
-	item; for a section it is the **first item of the section**, which is the
-	meaning a double press of `NVDA+Alt+PageDown` gives a section (section 3.1).
-	It is None for a section holding no items — such a section is valid
-	(section 2) and has no first item, so there is nowhere to go and the button
-	is disabled.
+	item; for a section it is the **first item of the section**, literally the
+	first and not the first visible (section 5.1). The scan of section 3.4 is
+	deliberately not used: the tree shows the whole structure however the
+	filter is set, so the tester is pointing at a section they can see in full,
+	and from 0.2.0 that scan would land them somewhere other than the item they
+	were looking at. It is None for a section holding no items — such a section
+	is valid (section 2) and has no first item, so there is nowhere to go and
+	the button is disabled.
 
 	`item` is what "Open item" would open and what the panel below the tree
 	shows. It is None on a section, which carries no item of its own.
@@ -369,13 +385,16 @@ class _ChecklistWindow(wx.Dialog):
 		self._move_to.Enable(node is not None and node.position is not None)
 
 	def _selected(self) -> _Node | None:
-		"""What the selected node stands for, or None when nothing is selected.
+		"""What the selected node stands for, or None when nothing is selected."""
+		return self._stands_for(self._tree.GetSelection())
+
+	def _stands_for(self, node: wx.TreeItemId) -> _Node | None:
+		"""What `node` stands for, or None when it is not a node of this tree.
 
 		None means an empty tree or, in principle, a tree holding no selection;
 		every node the window builds carries a `_Node`, so a node that does not
 		is a programming error rather than a state.
 		"""
-		node = self._tree.GetSelection()
 		if not node.IsOk():
 			return None
 		data = self._tree.GetItemData(node)
@@ -414,18 +433,19 @@ class _ChecklistWindow(wx.Dialog):
 		as its parent — which is the whole difference, and `modal.show` holds
 		what it means.
 
-		The node is read now rather than in the callback, and that is what makes
-		the label update land on the right one: the dialog cannot move the
-		selection, but reading it once is one fewer thing to be true.
+		The node is read once, here, and both what it stands for and the label
+		to be updated afterwards come off that one read: the dialog cannot move
+		the selection, but asking twice is one more thing that would have to
+		stay true.
 		"""
 		node = self._tree.GetSelection()
-		selected = self._selected()
-		if selected is None or selected.item is None:
+		stands_for = self._stands_for(node)
+		if stands_for is None or stands_for.item is None:
 			# Unreachable through the window: the button is disabled wherever
 			# there is no item under the selection.
 			log.error("the item dialog was asked for on a node holding no item")
 			return
-		item = selected.item
+		item = stands_for.item
 		itemdialog.show(
 			item,
 			lambda status_value, comment: self._saved(node, item, status_value, comment),

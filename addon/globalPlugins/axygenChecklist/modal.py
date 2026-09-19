@@ -174,27 +174,28 @@ def _show(
 	then: Callable[[DialogT, int], None],
 	parent: wx.Window | None,
 ) -> None:
-	if parent is not None:
-		inner = create(parent)
-		try:
-			then(inner, displayDialogAsModal(inner))
-		finally:
-			_ = inner.Destroy()
-		return
-	frame = gui.mainFrame
-	if frame is None:
-		# NVDA has no main frame before its GUI is up and after it has been
-		# torn down, and no script of the add-on runs in either window of
-		# time. Nothing has changed, so there is nothing to say out loud.
-		log.error("no main frame to show a window of the add-on from")
-		return
-	dialog = create(frame)
+	owner: wx.Window | None = parent
+	# Whose foreground is borrowed for the window, and None when it is already
+	# ours: that one fact is the whole of what `parent` changes here.
+	surround = None
+	if owner is None:
+		surround = gui.mainFrame
+		if surround is None:
+			# NVDA has no main frame before its GUI is up and after it has been
+			# torn down, and no script of the add-on runs in either window of
+			# time. Nothing has changed, so there is nothing to say out loud.
+			log.error("no main frame to show a window of the add-on from")
+			return
+		owner = surround
+	dialog = create(owner)
 	try:
-		frame.prePopup()
+		if surround is not None:
+			surround.prePopup()
 		try:
 			answer = displayDialogAsModal(dialog)
 		finally:
-			frame.postPopup()
+			if surround is not None:
+				surround.postPopup()
 		then(dialog, answer)
 	finally:
 		_ = dialog.Destroy()
