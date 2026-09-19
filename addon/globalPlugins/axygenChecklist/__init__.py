@@ -410,7 +410,10 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 		# command of the add-on is blocked behind it, and `modal.show` clears
 		# the series besides (section 3.3.1).
 		item = navigation.item_at(loaded, position)
-		itemdialog.show(item, lambda value, comment: self._save_item(loaded, item, value, comment))
+		itemdialog.show(
+			item,
+			lambda status_value, comment: self._save_item(loaded, item, status_value, comment),
+		)
 
 	@script(
 		description=_(
@@ -786,7 +789,7 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 		ui.message(wording.status_word(item.status))
 		self._announce_completion(loaded)
 
-	def _save_item(self, loaded: Checklist, item: Item, value: str, comment: str) -> None:
+	def _save_item(self, loaded: Checklist, item: Item, status_value: str, comment: str) -> None:
 		"""Write what the item dialog was closed on, and say what moved (section 3.3.1).
 
 		The far side of the second press of `NVDA+Alt+I`. The window collected
@@ -805,25 +808,28 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 		only that the phrase comes after the write, as section 4 has it for
 		every command that changes data.
 
-		Everything spoken goes out through `modal.message`: the window has just
-		handed the focus back, and NVDA is about to announce the window that
-		took it, so a phrase queued at once would be cut off by it (section 6).
+		Everything spoken goes out late: the window has just handed the focus
+		back, and NVDA is about to announce the window that took it, so a
+		phrase queued at once would be cut off by it (section 6). The end of a
+		run goes through `modal.later` rather than `modal.message` because it
+		is a tone **and** a phrase, and delaying only the phrase would leave
+		the tone sounding a window announcement ahead of it.
 
 		**No auto-advance** (section 4): the dialog is a deliberate stop on one
 		item, and moving the position quietly behind a closing window would
 		leave the next command describing a different item than the one just
-		edited. The end-of-run notice is the opposite case and is spoken — but
+		edited. The end-of-run notice is the opposite case and is given — but
 		only when the **status** moved, because a comment added to a checklist
 		that had nothing pending before it closed nothing.
 		"""
-		change = checklist.Change.of(item, value, comment)
+		change = checklist.Change.of(item, status_value, comment)
 		if not change.anything:
 			return
-		if not self._write(loaded, lambda: item.record(value, comment), say=modal.message):
+		if not self._write(loaded, lambda: item.record(status_value, comment), say=modal.message):
 			return
 		modal.message(wording.spoken_save(change))
 		if change.status is not None:
-			self._announce_completion(loaded, say=modal.message)
+			modal.later(lambda: self._announce_completion(loaded))
 
 	def _reset_section(self, loaded: Checklist, section: Section) -> None:
 		"""Put every item of `section` back to pending, erase its comments, say so.
@@ -885,11 +891,7 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 			return False
 		return True
 
-	def _announce_completion(
-		self,
-		loaded: Checklist,
-		say: Callable[[str], None] = ui.message,
-	) -> None:
+	def _announce_completion(self, loaded: Checklist) -> None:
 		"""Say that the run is over, when this status left nothing pending.
 
 		Section 4, and it belongs to every path that gives an item a status —
@@ -914,16 +916,17 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 		`ui.message`, and `signals` is the only module that touches `tones`, so
 		that the four signals can be picked to differ from one another.
 
-		`say` is the choice every phrase of the add-on makes: `ui.message` from
-		a command that ran with the focus where the tester left it, and
-		`modal.message` from a save out of the item dialog, whose window has
-		just given the focus back (section 6).
+		**The tone is why this takes no `say` of its own**, unlike everything
+		else the add-on speaks. A save from the item dialog cannot delay the
+		phrase and leave the tone where it was — that would part the two by a
+		whole window announcement — so the caller delays the pair instead, with
+		`modal.later`, and what happens inside here is the same either way.
 		"""
 		counted = progress.of(loaded.items)
 		if not counted.finished:
 			return
 		signals.checklist_finished()
-		say(wording.spoken_completion(counted))
+		ui.message(wording.spoken_completion(counted))
 
 	def _standing(self) -> tuple[Checklist, Position] | None:
 		"""The checklist and the place in it a command works on, or None for neither.

@@ -201,7 +201,7 @@ class Item:
 		self._set_status(value)
 		self._rewrite()
 
-	def record(self, value: str, comment: str | None) -> None:
+	def record(self, status_value: str, comment: str | None) -> None:
 		"""Give the item this status and this comment, and rewrite the file once.
 
 		What a save from the item dialog does (section 3.3.1). Both fields
@@ -214,7 +214,7 @@ class Item:
 		`comment` is normalised on the way in, as everywhere else: a blank one
 		and an absent one are the same state (section 2).
 		"""
-		self._set_status(value)
+		self._set_status(status_value)
 		_set_comment(self._data, comment)
 		self._rewrite()
 
@@ -383,11 +383,11 @@ class Change:
 	"""
 
 	#: The status to write, and None when it is the one standing there already.
-	status: str | None = None
-	comment: CommentChange = CommentChange.UNCHANGED
+	status: str | None
+	comment: CommentChange
 
 	@classmethod
-	def of(cls, item: Item, value: str, comment: str | None) -> "Change":
+	def of(cls, item: Item, status_value: str, comment: str | None) -> "Change":
 		"""What giving `item` this status and this comment would alter.
 
 		Nothing is written and nothing on the item moves: this is the question
@@ -400,7 +400,7 @@ class Change:
 		"""
 		after = _text(comment)
 		return cls(
-			status=value if value != item.status else None,
+			status=status_value if status_value != item.status else None,
 			comment=_comment_change(item.comment, after),
 		)
 
