@@ -7,7 +7,7 @@ msgstr ""
 "Project-Id-Version: 'axygenChecklist' '0.0.0'\n"
 "Report-Msgid-Bugs-To: 'https://github.com/ruslan-rv-ua/axygen-checklist/"
 "issues'\n"
-"POT-Creation-Date: 2026-09-19 20:06+0300\n"
+"POT-Creation-Date: 2026-09-19 20:33+0300\n"
 "PO-Revision-Date: 2026-09-16 20:04+0300\n"
 "Last-Translator: Ruslan Iskov <ruslan.rv.ua@gmail.com>\n"
 "Language-Team: Ukrainian\n"
@@ -68,6 +68,12 @@ msgstr "Чекліст"
 #. writes their conclusion about the checklist item.
 msgid "Comment"
 msgstr "Коментар"
+
+#. Translators: The label of the checkbox of the add-on's window that turns on and
+#. off moving to the next checklist item once this one has a verdict. The same
+#. option is on the A key of the command mode.
+msgid "Automatically move to the next item after marking one"
+msgstr "Автоматично переходити до наступного пункту після відмітки"
 
 #. Translators: The label of the button of the add-on's window that opens the
 #. selected checklist item in the item dialog. The letter after the ampersand is

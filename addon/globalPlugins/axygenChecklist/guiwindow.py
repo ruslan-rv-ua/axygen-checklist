@@ -53,6 +53,12 @@ the checklist it was showing already. Whether anything changed, what reaches
 the file, what `state.json` gets and what is spoken are settled where every
 other change of data is settled, in the plugin and the core.
 
+**The auto-advance checkbox is the one thing in here that writes**, and it is
+not an exception to that but a different kind of thing: the option is NVDA's
+own configuration (section 4) rather than data of the checklist, so there is
+nothing for the plugin or the core to settle about it. Why it is written where
+it is shown, and why nothing reads it back, is `_on_auto_advance`'s to say.
+
 **One module-level reference, and it is there for `close()`.** A reload of the
 plugins (`NVDA+Ctrl+F3`) is not blocked while a modal dialog is open — NVDA
 does not decorate its own reload — so the plugin can be terminated with this
@@ -72,7 +78,7 @@ import wx
 from gui import guiHelper
 from logHandler import log
 
-from . import itemdialog, modal, wording
+from . import itemdialog, modal, preferences, wording
 from .core.checklist import Checklist, Item
 from .core.navigation import Position
 
@@ -310,6 +316,20 @@ class _ChecklistWindow(wx.Dialog):
 			style=wx.TE_READONLY | wx.TE_MULTILINE,
 			size=(_CONTROL_WIDTH, _PANEL_HEIGHT),
 		)
+		auto_advance_box = contents.addItem(
+			wx.CheckBox(
+				self,
+				# Translators: The label of the checkbox of the add-on's window that turns on and
+				# off moving to the next checklist item once this one has a verdict. The same
+				# option is on the A key of the command mode.
+				label=_("Automatically move to the next item after marking one"),
+			),
+		)
+		# It opens at whatever the option is (section 4), and it is not kept,
+		# for the reason the `Browse...` button is not: nothing in here changes
+		# it again. What happens when the tester does is `_on_auto_advance`'s.
+		auto_advance_box.SetValue(preferences.auto_advance())
+		auto_advance_box.Bind(wx.EVT_CHECKBOX, self._on_auto_advance)
 		buttons = guiHelper.ButtonHelper(wx.HORIZONTAL)
 		self._open_item: wx.Button = buttons.addButton(
 			self,
@@ -619,6 +639,39 @@ class _ChecklistWindow(wx.Dialog):
 			modal.report(answer, parent=self)
 			return
 		self._fill(answer.checklist, answer.position)
+
+	def _on_auto_advance(self, event: wx.CommandEvent) -> None:
+		"""Auto-advance was turned on or off: write it, now (sections 4 and 5).
+
+		The second way to the option the `A` key of the command mode carries,
+		and the same one value: `config.conf["axygenChecklist"]["autoAdvance"]`,
+		read when this window was built and written here. There is no third
+		place it is kept — not a field of this window holding it until some OK,
+		because **this window has no OK**. A set of changes to be confirmed
+		somewhere does not exist in it, any more than a deferred write exists in
+		section 2, so applying at the moment of the toggle is the shape of the
+		window rather than a way around a race.
+
+		The write goes straight out to `preferences` rather than back through a
+		callback, which is the one place this window settles anything. The
+		option is NVDA's own configuration and not data of the checklist, so
+		neither the plugin nor the core has anything to add to a toggle of it —
+		no file, no position, no phrase — and a callback out to a one-line
+		assignment would be ceremony.
+
+		**Nothing is said**, and nothing needs to be: NVDA announces the new
+		state of a checkbox that was just toggled, which is the proof, and a
+		second word over the top of it is the noise section 5 keeps out. The two
+		phrases of the `A` key stay with the key, which has no such proof to
+		lean on — there is no window there at all.
+
+		**Nothing reads this back either.** While the window stands `A` cannot
+		be pressed — it is blocked with every other command (section 3.3.1) — so
+		there is nothing to keep in step with and no watcher on `config.conf` to
+		want. The next window built reads the value afresh, and the value is
+		NVDA's own.
+		"""
+		preferences.set_auto_advance(event.IsChecked())
 
 	def _on_open_item(self, event: wx.CommandEvent) -> None:
 		"""Open the item dialog on the selected item (section 5.2).

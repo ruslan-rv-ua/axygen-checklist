@@ -37,10 +37,9 @@ clipboard, and the run says so when nothing is left unchecked. The window opens
 too, on the tree of the whole checklist and the comment of whatever is selected
 in it; Enter on an item opens the item dialog there, Ctrl+Enter moves the run
 to that item and closes the window, Browse... picks another checklist without
-leaving it, and one button puts the whole run back to unchecked. What is
-missing sits around that core.
+leaving it, one button puts the whole run back to unchecked, and a checkbox
+turns auto-advance on and off. What is missing sits around that core.
 
-* **The rest of the window**: the auto-advance checkbox. Due in 0.1.0.
 * **Filtering to unchecked items** — due in 0.2.0.
 
 Until 1.0.0 the checklist file format and the set of commands may still change
