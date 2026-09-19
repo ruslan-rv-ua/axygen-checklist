@@ -5,10 +5,16 @@
 
 """The window one item is looked at and answered in (section 3.3.1).
 
-The second press of `NVDA+Alt+I` opens it (section 3.3). It is the only place
-in the add-on where a comment is entered, and the third of the three ways a
-status is set — the other two never open a window at all, which is what leaves
-the focus invariant of section 1 intact while this one stands.
+The second press of `NVDA+Alt+I` opens it (section 3.3), and so does Enter on
+the tree of the GUI window (section 5.1). It is the only place in the add-on
+where a comment is entered, and the third of the three ways a status is set —
+the other two never open a window at all, which is what leaves the focus
+invariant of section 1 intact while this one stands.
+
+**Two ways in, one window.** Nothing below turns on which was used: the
+fields, the Tab order, the buttons and the chord are the same, and what the
+window collects is the same pair. Only how it is shown differs, and `show`
+hands that to `modal` (sections 5.2 and 6).
 
 **It collects, and it decides nothing.** What the tester chose comes back out
 of `show` as a pair of plain values, and what that pair means — whether
@@ -117,7 +123,7 @@ _READ_ONLY_HEIGHT = 60
 _COMMENT_HEIGHT = 120
 
 
-def show(item: Item, then: Callable[[str, str], None]) -> None:
+def show(item: Item, then: Callable[[str, str], None], parent: wx.Window | None = None) -> None:
 	"""Open the dialog on `item`, and hand what Save was pressed on to `then`.
 
 	`then` is given the status standing in the combo box and the comment as
@@ -127,18 +133,24 @@ def show(item: Item, then: Callable[[str, str], None]) -> None:
 	and the window being closed all mean the same thing, and section 3.3.1
 	answers that with silence and no file.
 
+	`parent` is the GUI window when the dialog was opened from its tree
+	(section 5.2), and None for the second press of `NVDA+Alt+I`. The window
+	is the same one either way — same fields, same Tab order, same buttons;
+	all that differs is how it is shown, and `modal.show` holds that
+	difference.
+
 	Called long after the script that asked has returned; `modal.show` says
 	why, and holds the focus, the modality counter and the end of the series.
 	"""
 
-	def create(parent: wx.Window) -> _ItemDialog:
-		return _ItemDialog(parent, item)
+	def create(owner: wx.Window) -> _ItemDialog:
+		return _ItemDialog(owner, item)
 
 	def answered(dialog: _ItemDialog, answer: int) -> None:
 		if answer == wx.ID_SAVE:
 			then(dialog.chosen_status, dialog.typed_comment)
 
-	modal.show(create, answered)
+	modal.show(create, answered, parent)
 
 
 class _ItemDialog(wx.Dialog):

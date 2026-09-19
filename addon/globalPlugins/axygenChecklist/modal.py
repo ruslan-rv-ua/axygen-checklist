@@ -5,12 +5,13 @@
 
 """The one way a window of the add-on is shown.
 
-Section 6 of docs/requirements.md gives every modal window of the add-on the
-same life — the item dialog, the confirmation of a reset (of a section,
-section 3.2.2, or of the run, section 5), the file dialog and the dialog of
-fragments: every window but the GUI, which is not modal and lives long
-(section 3.3.1) — and this module is where that life is written down once, so
-that the windows themselves hold only what they ask.
+Section 6 of docs/requirements.md gives every window of the add-on the same
+life — the item dialog, the confirmation of a reset (of a section, section
+3.2.2, or of the run, section 5), the file dialog, the dialog of fragments
+and the GUI window itself — and this module is where that life is written
+down once, so that the windows themselves hold only what they ask. There is
+no non-modal window any more, and section 5 says what the add-on bought by
+giving the last one up.
 
 **The script that asks for a window returns first.** The window is shown from
 `wx.CallAfter`, and this is not a nicety: NVDA runs a script for every press of
@@ -31,12 +32,20 @@ here rather than left to `displayDialogAsModal` because that function calls it
 itself only for a window without a parent, and a window without a parent is not
 one section 6 allows.
 
+**One window is opened from another, and `show` takes a `parent` for it.** The
+item dialog reached from the tree of the GUI window (section 5.2) hangs off
+that window instead, and then the pair above is not called at all and the
+series is not cleared: both are about coming in from somebody else's
+application, and this one comes in from ours. `show` says what each of the
+three changes is for.
+
 **The series ends with the window** (section 6). `scriptHandler.clearLastScript()`
-is called on the way in, for every window and not only the item dialog section
-3.3.1 asks it for: a press right after the window has closed would otherwise
-count as the next press of the series that opened it, and the add-on defines no
-behaviour for a third press. For a window opened from the command mode the call
-changes nothing, which is what makes it safe to make always.
+is called on the way in, for every window a script opened and not only the item
+dialog section 3.3.1 asks it for: a press right after the window has closed
+would otherwise count as the next press of the series that opened it, and the
+add-on defines no behaviour for a third press. For a window opened from the
+command mode the call changes nothing, which is what makes it safe to make
+always.
 
 **What is said after a window has closed is said late** (section 6). The window
 gives the focus back to the application under test, and NVDA handles that
@@ -128,6 +137,7 @@ def _nothing(dialog: wx.Dialog, answer: int) -> None:
 def show(
 	create: Callable[[wx.Window], DialogT],
 	then: Callable[[DialogT, int], None] = _nothing,
+	parent: wx.Window | None = None,
 ) -> None:
 	"""Show the window `create` builds, once the script asking has returned.
 
@@ -142,26 +152,50 @@ def show(
 	A `then` that opens a window of its own is safe: this one has closed and
 	been destroyed by the time the next is built, because `show` schedules
 	rather than shows. That is the path from the file dialog to the error.
+
+	**`parent` is for the one window opened from another window of the add-on**
+	— the item dialog reached from the tree of the GUI window (section 5.2) —
+	and passing it changes three things at once, all for the same reason: the
+	foreground already belongs to us. The window hangs off that one rather than
+	off `gui.mainFrame`; `prePopup()` / `postPopup()` are not called, because
+	the first brings NVDA forward out of somebody else's application and the
+	second would blank `gui.mainFrame.prevFocus` in the middle of the outer
+	window's life — erasing where the focus must go when **that** one closes;
+	and the series is not cleared, because no script opened this and there is
+	no series to end (section 6).
 	"""
-	wx.CallAfter(_show, create, then)
-	scriptHandler.clearLastScript()
+	wx.CallAfter(_show, create, then, parent)
+	if parent is None:
+		scriptHandler.clearLastScript()
 
 
-def _show(create: Callable[[wx.Window], DialogT], then: Callable[[DialogT, int], None]) -> None:
-	frame = gui.mainFrame
-	if frame is None:
-		# NVDA has no main frame before its GUI is up and after it has been
-		# torn down, and no script of the add-on runs in either window of
-		# time. Nothing has changed, so there is nothing to say out loud.
-		log.error("no main frame to show a window of the add-on from")
-		return
-	dialog = create(frame)
+def _show(
+	create: Callable[[wx.Window], DialogT],
+	then: Callable[[DialogT, int], None],
+	parent: wx.Window | None,
+) -> None:
+	owner: wx.Window | None = parent
+	# Whose foreground is borrowed for the window, and None when it is already
+	# ours: that one fact is the whole of what `parent` changes here.
+	surround = None
+	if owner is None:
+		surround = gui.mainFrame
+		if surround is None:
+			# NVDA has no main frame before its GUI is up and after it has been
+			# torn down, and no script of the add-on runs in either window of
+			# time. Nothing has changed, so there is nothing to say out loud.
+			log.error("no main frame to show a window of the add-on from")
+			return
+		owner = surround
+	dialog = create(owner)
 	try:
-		frame.prePopup()
+		if surround is not None:
+			surround.prePopup()
 		try:
 			answer = displayDialogAsModal(dialog)
 		finally:
-			frame.postPopup()
+			if surround is not None:
+				surround.postPopup()
 		then(dialog, answer)
 	finally:
 		_ = dialog.Destroy()
