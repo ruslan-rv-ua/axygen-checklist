@@ -124,6 +124,11 @@ from gui import blockAction
 from logHandler import log
 from scriptHandler import script
 
+# `override` is in `typing` from Python 3.12 on. NVDA 2025.3 runs the add-on under
+# 3.11 and ships `typing_extensions` for its own use, so that is where it comes from
+# until the Python of `addon_lastTestedNVDAVersion` moves.
+from typing_extensions import override
+
 from . import (
 	commandmode,
 	fragmentsdialog,
@@ -269,6 +274,7 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 		postNvdaStartup.register(self._announce_restore)
 		log.info("Axygen Checklist loaded")
 
+	@override
 	def terminate(self) -> None:
 		"""NVDA is done with this plugin: let go of everything that outlives it.
 
