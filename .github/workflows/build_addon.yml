@@ -2,9 +2,25 @@ name: build addon
 
 on:
   push:
-    # Tags only: development builds are deliberately not published, since the
-    # working copy is tested through the development link (docs/development.md).
+    # A tag publishes: `upload_release` below turns it into a GitHub release.
+    # Development builds are deliberately not published, since the working copy
+    # is tested through the development link (docs/development.md).
     tags: ["v*"]
+
+    # A push to a release or hotfix branch builds and publishes nothing. This
+    # runner is the one the tag will get -- Linux, gettext from apt -- and it is
+    # the only place `scons` runs anywhere but Windows, so what breaks here alone
+    # would otherwise first break on the tag: after `main` has moved and the tag
+    # is set, when a failure costs deleting the release and the tag rather than
+    # one more commit on the branch. docs/development.md, section 7, waits for
+    # this run before the branch is finished.
+    #
+    # Calling this file from `release_checks.yml` through `workflow_call` was the
+    # alternative. GitHub checks the permissions of a called workflow statically,
+    # skipped jobs included, so the caller would have to grant `contents: write`
+    # for `upload_release` -- a job that never runs off a branch -- and the build
+    # would carry a write token it has no use for.
+    branches: ["release/**", "hotfix/**"]
 
   pull_request:
     branches: [ main, develop ]
@@ -48,6 +64,7 @@ jobs:
 
   upload_release:
     runs-on: ubuntu-latest
+    # Off a branch push or a pull request only `build` above runs.
     if: ${{ startsWith(github.ref, 'refs/tags/') }}
     needs: ["build"]
     permissions:
