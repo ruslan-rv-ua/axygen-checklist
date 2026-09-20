@@ -17,9 +17,12 @@ hooks = [
 [[repos]]
 repo = "builtin"
 hooks = [
-  # `no-commit-to-branch` is deliberately not enabled: it also blocks the merge
-  # commits that `git flow release finish` makes on `main`. The branching policy
-  # lives in CLAUDE.md instead.
+  # `no-commit-to-branch` is deliberately not enabled: it guards `main` and `master`,
+  # and `git flow release finish` commits on `main` whenever the merge is not a
+  # fast-forward -- that is, whenever `main` has moved since the branch was cut, as it
+  # has after a hotfix. Stopping a finish halfway through leaves the release merged
+  # only in part, which costs more than the hook is worth. The branching policy lives
+  # in CLAUDE.md instead.
 
   # Checks that large files have not been added. Default cut-off for "large" files is 500kb.
   { id = "check-added-large-files" },
