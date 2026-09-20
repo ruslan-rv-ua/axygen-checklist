@@ -117,6 +117,11 @@ def tree_label(item: Item) -> str:
 	paragraph in one would undo that, which is what the panel under the tree is
 	for.
 
+	Neither is the marker `spoken_item` puts on a commented item (section 5).
+	The tree answers that with a tone instead — `signals.node_has_comment`,
+	sounded whenever a commented node is announced — and the tone says the same
+	thing before the label is read and costs it no length at all.
+
 	The order is the reverse of the sentence spoken about an item (`spoken_item`),
 	and section 3.3 says why: a tree is scanned down the page, and a prefix
 	filters it by ear from the first syllable, whereas a single item spoken on
@@ -208,6 +213,13 @@ def spoken_item(item: Item, section_name: str | None = None) -> str:
 	written by the tester and may be a paragraph — speaking it on every pass
 	would punish them for having been thorough. The marker costs two words, and
 	the text itself is one press of the item dialog away.
+
+	Those two words are the **marker**, and they belong to speech alone. The
+	same fact reaches the tree of the GUI window as the **comment signal**, a
+	tone (`signals.node_has_comment`), and the two names are kept apart on
+	purpose. Here the words already sit inside a sentence being listened to
+	whole; there the sentence is the label of a node, which section 2 keeps
+	short, and a tone says it earlier for nothing (section 3.3).
 
 	Fragments (section 2) carry no marker of their own and keep their
 	delimiters: they lie *inside* the text that is being spoken, so hearing the

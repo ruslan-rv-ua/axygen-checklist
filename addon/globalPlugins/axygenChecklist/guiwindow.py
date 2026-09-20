@@ -28,6 +28,14 @@ announcing the focused node of the tree is the proof that something happened,
 and a second word over the top of it is noise. Only failures speak, and the
 one that can happen here is a write that did not reach the disk (section 4).
 
+**The one sound the window makes is not a word**: the tree plays the comment
+signal (section 5) on every node it announces whose item carries a comment.
+The rule of silence above is about words, which is what would be laid over
+NVDA's own proof; a tone does not stand in the speech queue at all and cuts
+nothing off. What it buys is the one save that the labels cannot show — a
+comment saved on its own leaves the prefix exactly as it was (section 5.2).
+Keeping that rule free of exceptions is what `_filling` is for.
+
 **Two actions live on the tree**, and both are buttons with a key that leads
 to them (section 5.1). Enter opens the item dialog on the selected item, by
 synthesising a click on "Open item" — Enter does not reach a default button
@@ -78,7 +86,7 @@ import wx
 from gui import guiHelper
 from logHandler import log
 
-from . import itemdialog, modal, preferences, wording
+from . import itemdialog, modal, preferences, signals, wording
 from .core.checklist import Checklist, Item
 from .core.navigation import Position
 
@@ -291,6 +299,13 @@ class _ChecklistWindow(wx.Dialog):
 		#: the reset, which has to build the same tree again from the far side
 		#: of a document every label of which has moved.
 		self._showing: Standing | None = None
+		#: True while the window builds the tree itself, and that is the whole of
+		#: what tells the window's own work apart from a step the tester took
+		#: through the tree — the comment signal sounds for the second and not
+		#: the first. `_fill` runs three times over the life of a window: at the
+		#: door, after a `Browse...` and after a reset, and sections 5 and 5.3
+		#: have all three of them silent.
+		self._filling = False
 		# A dialog carries `wx.TAB_TRAVERSAL` itself, so there is no panel here
 		# and nothing to hold one: that panel existed only to give a frame the
 		# Tab walk it has not got (sections 5 and 6).
@@ -483,6 +498,13 @@ class _ChecklistWindow(wx.Dialog):
 		there is nothing to erase, and an irreversible question about nothing
 		would cost more than a button that cannot be pressed (section 5).
 		"""
+		# Filling the tree moves the selection twice over — `DeleteAllItems` takes
+		# it off the node it was on and `_select` puts it on the new one — and wx
+		# raises the selection event for both, inside these calls. The flag covers
+		# the whole of the work rather than one line of it, because all of it is
+		# the window's own doing and none of it is a step the tester took
+		# (section 5).
+		self._filling = True
 		self._showing = None if checklist is None else Standing(checklist, position)
 		self._reset_all.Enable(self._showing is not None)
 		self._path.SetValue(
@@ -506,6 +528,7 @@ class _ChecklistWindow(wx.Dialog):
 					standing = leaf
 		self._tree.ExpandAll()
 		self._select(root if standing is None else standing)
+		self._filling = False
 
 	def _select(self, standing: wx.TreeItemId) -> None:
 		"""Stand on `standing`, or on the first node when that one is the root.
@@ -548,13 +571,23 @@ class _ChecklistWindow(wx.Dialog):
 		question: "Open item" wants an item and a section has none, while "Move
 		to" wants somewhere to go and a section has one — its first item —
 		unless it is empty (section 5.1).
+
+		**The comment signal sounds from here** (section 5), which is to say on
+		every announcement of a node and not only on a step the tester took: a
+		save from the item dialog announces a node too, and it is the one where
+		the label has no proof to give (section 5.2). That is what buys a rule
+		with no exception in it, and `_filling` keeps the window's own three
+		rebuilds silent without one.
 		"""
 		node = self._selected()
-		self._comment.SetValue(
-			"" if node is None or node.item is None or node.item.comment is None else node.item.comment,
-		)
+		# Read once and used twice, because the panel and the signal are two
+		# surfaces of the one fact (section 5) rather than two questions.
+		comment = None if node is None or node.item is None else node.item.comment
+		self._comment.SetValue("" if comment is None else comment)
 		self._open_item.Enable(node is not None and node.item is not None)
 		self._move_to.Enable(node is not None and node.position is not None)
+		if comment is not None and not self._filling:
+			signals.node_has_comment()
 
 	def _selected(self) -> _Node | None:
 		"""What the selected node stands for, or None when nothing is selected."""
