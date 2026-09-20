@@ -9,17 +9,18 @@
 	// and strict mode reports the whole file.
 	"typeCheckingMode": "strict",
 	"pythonPlatform": "Windows",
-	// Both ends of the supported range execute the add-on under Python 3.11: NVDA 2025.3,
-	// named by `addon_lastTestedNVDAVersion` in buildVars.py, and NVDA 2025.1, named by
-	// `addon_minimumNVDAVersion` beside it. The build environment runs a newer Python,
-	// which must not tempt the add-on into syntax the screen reader cannot execute.
+	// Both ends of the supported range execute the add-on under Python 3.13: NVDA 2026.2,
+	// named by `addon_lastTestedNVDAVersion` in buildVars.py, and NVDA 2026.1, named by
+	// `addon_minimumNVDAVersion` beside it. The build environment runs the same 3.13, so
+	// nothing else in the toolchain would notice syntax the screen reader cannot
+	// execute; this number is what does, and it follows the ceiling on purpose.
 	//
 	// One number covers both runs only while the two releases agree on it. The day a
 	// raised `addon_lastTestedNVDAVersion` brings a newer Python than the floor's, this
 	// cannot become a second value here -- a file has one `pythonVersion` -- and the
 	// floor needs a configuration of its own. docs/development.md, "Перевірки перед
 	// комітом", lists what moves with which field.
-	"pythonVersion": "3.11",
+	"pythonVersion": "3.13",
 	"include": ["addon"],
 	"extraPaths": ["./addon", "../nvda/source"],
 	"venvPath": ".venv",

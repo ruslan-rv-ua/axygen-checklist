@@ -76,7 +76,7 @@ dev = [
     { name = "ruff", specifier = "==0.14.5" },
     { name = "scons", specifier = "==4.10.1" },
     { name = "uv", specifier = "==0.11.15" },
-    { name = "wxpython", marker = "sys_platform == 'win32'", specifier = "==4.2.2" },
+    { name = "wxpython", marker = "sys_platform == 'win32'", specifier = "==4.2.4" },
 ]
 l10n = [
     { name = "crowdin-api-client", specifier = "==1.24.1" },
@@ -91,7 +91,7 @@ lint = [
     { name = "pyright", extras = ["nodejs"], specifier = "==1.1.407" },
     { name = "ruff", specifier = "==0.14.5" },
     { name = "uv", specifier = "==0.11.15" },
-    { name = "wxpython", marker = "sys_platform == 'win32'", specifier = "==4.2.2" },
+    { name = "wxpython", marker = "sys_platform == 'win32'", specifier = "==4.2.4" },
 ]
 test = [{ name = "jsonschema", specifier = "==4.26.0" }]
 
@@ -438,15 +438,6 @@ wheels = [
 ]
 
 [[package]]
-name = "six"
-version = "1.17.0"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/94/e7/b2c673351809dca68a0e064b6af791aa332cf192da575fd474ed7d6f16a2/six-1.17.0.tar.gz", hash = "sha256:ff70335d468e7eb6ec65b95b99d3a2836546063f63acc5171de367e834932a81", size = 34031, upload-time = "2024-12-04T17:35:28.174Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/b7/ce/149a00dd41f10bc29e5921b496af8b574d8413afcd5e30dfa0ed46c2cc5e/six-1.17.0-py2.py3-none-any.whl", hash = "sha256:4721f391ed90541fddacab5acf947aa0d3dc7d27b2e1e8eda2be8970586c3274", size = 11050, upload-time = "2024-12-04T17:35:26.475Z" },
-]
-
-[[package]]
 name = "typing-extensions"
 version = "4.15.0"
 source = { registry = "https://pypi.org/simple" }
@@ -523,13 +514,11 @@ wheels = [
 
 [[package]]
 name = "wxpython"
-version = "4.2.2"
+version = "4.2.4"
 source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "six" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/a4/f5/8c272764770f47fd419cc2eff4c4fa1c0681c71bcc2f3158b3a83d1339ff/wxPython-4.2.2.tar.gz", hash = "sha256:5dbcb0650f67fdc2c5965795a255ffaa3d7b09fb149aa8da2d0d9aa44e38e2ba", size = 57358880, upload-time = "2024-09-12T02:44:55.263Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/80/6e/b70e6dbdd7cb4f154b7ca424b4c7799f7b067f7a9f4204b8d16d6464648f/wxpython-4.2.4.tar.gz", hash = "sha256:2eb123979c87bcb329e8a2452269d60ff8f9f651e9bf25c67579e53c4ebbae3c", size = 58583054, upload-time = "2025-10-29T13:22:37.726Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/fa/b1/bc06c1abb212e1a2358588037d4fa5d5f4c962dd287478f4d54e425854a0/wxPython-4.2.2-cp313-cp313-win32.whl", hash = "sha256:c9310864b088d0f68d212360f261c8fec46a543c952da21805177519622b8524", size = 14368445, upload-time = "2024-09-12T02:44:31.593Z" },
-    { url = "https://files.pythonhosted.org/packages/8c/df/5a9eca8dab4367c3efc27a42a6d6d407347261c2b7be5cead468d22f99e0/wxPython-4.2.2-cp313-cp313-win_amd64.whl", hash = "sha256:d8548ce4165e214601083d0d5767dba854a5e14f4e0ed4dbe56e2daf193a4575", size = 16416599, upload-time = "2024-09-12T02:44:34.459Z" },
+    { url = "https://files.pythonhosted.org/packages/26/a4/57b0110944f62ce37c4e3e5f9f1a116b6df2b7b8a3406a90b95272c211ad/wxpython-4.2.4-cp313-cp313-win32.whl", hash = "sha256:b0920fe193e2bbd90c6d3fbb9a8101f1276229638aff29f66bfe521901c3a0b8", size = 14506941, upload-time = "2025-10-29T04:02:34.513Z" },
+    { url = "https://files.pythonhosted.org/packages/77/d4/e1f63f1b4fe97a12f2dbe76feba678b2a35fd2d9d9c8c60ba94a271f01e8/wxpython-4.2.4-cp313-cp313-win_amd64.whl", hash = "sha256:a0a532ee6e6a3ce0d1fb2e223159d4b8ec42f8a844c852da936fb23cba6b9335", size = 16549467, upload-time = "2025-10-29T04:02:36.666Z" },
+    { url = "https://files.pythonhosted.org/packages/b3/1e/df43d6fcbde2389894a068e7d41d44820a19f1bb7a78daa8fb687cd8f1a8/wxpython-4.2.4-cp313-cp313-win_arm64.whl", hash = "sha256:e82ab099df0b6c55bcfad198822648a6275bbb575ce09502a9085b290ec9852d", size = 15533173, upload-time = "2025-10-29T04:02:39.139Z" },
 ]

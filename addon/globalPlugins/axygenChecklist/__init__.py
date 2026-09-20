@@ -104,6 +104,7 @@ will be the third way in and the same operation again.
 import dataclasses
 from collections.abc import Callable
 from pathlib import Path
+from typing import override
 
 import addonHandler
 import api
@@ -123,11 +124,6 @@ from core import postNvdaStartup
 from gui import blockAction
 from logHandler import log
 from scriptHandler import script
-
-# `override` is in `typing` from Python 3.12 on. NVDA 2025.3 runs the add-on under
-# 3.11 and ships `typing_extensions` for its own use, so that is where it comes from
-# until the Python of `addon_lastTestedNVDAVersion` moves.
-from typing_extensions import override
 
 from . import (
 	commandmode,

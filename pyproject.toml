@@ -59,7 +59,7 @@ lint = [
 	# nothing here ever runs wx. Pinned to the wxPython that ships inside the NVDA named by
 	# `addon_lastTestedNVDAVersion` in buildVars.py, and raised together with it. Windows only:
 	# PyPI has no Linux wheels for wxPython, and the sdist compiles wxWidgets from source.
-	"wxPython==4.2.2; sys_platform == 'win32'",
+	"wxPython==4.2.4; sys_platform == 'win32'",
 ]
 # Unit tests. `jsonschema` is tooling, never shipped: the add-on validates
 # checklists with its own pass, and section 7.3 of docs/requirements.md says why.

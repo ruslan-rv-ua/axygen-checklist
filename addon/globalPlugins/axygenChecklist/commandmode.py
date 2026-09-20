@@ -72,8 +72,9 @@ class CommandMode:
 		self._keys = dict(keys)
 		#: The timer counting this arming down, and the whole of the state:
 		#: None is a mode that is not armed, and the keys are bound exactly
-		#: while it is not None.
-		self._timer: wx.CallLater | None = None
+		#: while it is not None. wxPython 4.2.4 types `CallLater` by the callable
+		#: it runs, and the parameters spell out `_expire`: no arguments, no result.
+		self._timer: wx.CallLater[[], None] | None = None
 
 	def arm(self) -> None:
 		"""Take the keys for three seconds, and say so with a tone.

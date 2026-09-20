@@ -38,13 +38,21 @@ Checklists are plain JSON files that record the result of the run."""),
 	# Documentation file name
 	addon_docFileName="readme.html",
 	# Minimum NVDA version supported.
-	# 2025.1 is the first version that has every API the specification relies on:
-	# `gui.message.displayDialogAsModal` landed in 2023.3, `gui.blockAction` earlier
-	# still, and `gui.message.MessageDialog` — the confirmation dialog of section 3.2.2
-	# and section 5 — in 2025.1, the release that also deprecated `gui.messageBox`.
-	addon_minimumNVDAVersion="2025.1.0",
-	# Last NVDA version supported/tested.
-	addon_lastTestedNVDAVersion="2025.3.0",
+	# 2026.1 is the release that broke add-on compatibility -- Python 3.13 instead of
+	# 3.11, 64-bit instead of 32-bit -- and the one every current NVDA counts its
+	# `addonAPIVersion.BACK_COMPAT_TO` from. The API alone would allow 2025.1, the
+	# release that brought `gui.message.MessageDialog` (the confirmation dialog of
+	# section 3.2.2 and section 5); the runtime is what sets the floor: the add-on is
+	# developed and tested on 2026.x, and nothing in the project runs the Python or
+	# the bitness of 2025.x. Why, and what it costs, is in section 6 of
+	# docs/requirements.md.
+	addon_minimumNVDAVersion="2026.1.0",
+	# Last NVDA version supported/tested: the newest stable release. It must not fall
+	# below the `BACK_COMPAT_TO` of the NVDA that runs the add-on, or NVDA blocks it as
+	# incompatible and the Add-on Store leaves it out of the list -- silently, in both
+	# cases. The table of these numbers kept by the store, and the check made before
+	# each release, are in docs/development.md, section 7.
+	addon_lastTestedNVDAVersion="2026.2.0",
 	# Add-on update channel (default is None, denoting stable releases,
 	# and for development releases, use "dev".)
 	addon_updateChannel=None,
