@@ -1424,7 +1424,7 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 		properly would mean a `BeepCommand` inside a speech sequence, which
 		costs both rules it would break: section 4 sends every message through
 		`ui.message`, and `signals` is the only module that touches `tones`, so
-		that the four signals can be picked to differ from one another.
+		that the five signals can be picked to differ from one another.
 
 		**The tone is why this takes no `say` of its own**, unlike everything
 		else the add-on speaks. A save from the item dialog cannot delay the

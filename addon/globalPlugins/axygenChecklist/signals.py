@@ -95,9 +95,20 @@ def command_mode_expired() -> None:
 #: the most frequent sound the add-on makes (section 3.1), so it is the one most
 #: likely to be tried again by ear on a real machine with a real synthesiser —
 #: and a name can be moved from NVDA's Python console,
-#: `signals._COMMENT_SIGNAL_HZ = 330`, between one step of the tree and the
+#: `signals._COMMENT_SIGNAL_HZ = 1760`, between one step of the tree and the
 #: next, where a number inside the call would cost a reload for every candidate.
-#: `samples/comment-signal-by-ear.json` carries that line as a fragment.
+#: `samples/comment-signal-by-ear.json` carries such a line as a fragment.
+#:
+#: **What a candidate may be is section 3.1's to say, not this pair's.** The
+#: relation is normative and the numbers are not, so a candidate stays above
+#: 1200 and under 40 — otherwise it is no longer the highest and the shortest
+#: of the five, and the tone that was retuned is a different decision rather
+#: than the same one heard again.
+#:
+#: Private, and the console does not argue with that: the underscore says no
+#: other module of the add-on may depend on these, which stays true and worth
+#: keeping. A console is not a module, and what anything else would have to
+#: depend on is the relation, which lives in the specification.
 _COMMENT_SIGNAL_HZ = 1500
 _COMMENT_SIGNAL_MS = 10
 
@@ -114,12 +125,22 @@ def node_has_comment() -> None:
 	and no numbers, so the pair above can be retuned by ear without touching
 	it.
 
-	**It sounds whenever the tree announces such a node**, however the
-	selection got there: an arrow, a first letter, the mouse, or the focus
-	coming back from the item dialog. That is one rule with no exception rather
-	than a rule about keystrokes, and it is what makes a save of nothing but a
+	**It sounds whenever the tree puts such a node up**, whatever brought it
+	there: the selection landing on it by arrow, first letter or mouse, or the
+	item under the selection having just been saved from the dialog. The rule
+	is about the node and not about the key that served it, which is what
+	leaves it without an exception — a save is the second case of it rather
+	than a way out of the first. That is what makes a save of nothing but a
 	comment audible: the label does not change — same status, same prefix —
 	so the label has no proof to give, and the tone is the proof (section 5.2).
+
+	Focus returning to a tree that has not moved says nothing: Shift+Tab out of
+	the comment panel and back, or Alt+Tab into the window, leave the node
+	exactly where it stood. `_follow_selection` is not reached then, and that
+	is the behaviour section 5 asks for rather than a gap in it — the signal
+	answers "what have I come to", not "where is the focus", and a tone on the
+	way back from the panel would sound in the one moment the comment has just
+	been read.
 
 	**It is heard ahead of the label it belongs to, and cannot be put after
 	it.** The selection event arrives in wx synchronously with the keypress,

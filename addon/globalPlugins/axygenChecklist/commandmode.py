@@ -30,7 +30,7 @@ from `_scriptDecoratorGestures`. One arming of the mode would leave the add-on
 with no hotkeys at all until NVDA restarted — and the trap is a quiet one,
 since arming works and everything after it does not.
 
-**Two of the four tones of the add-on are raised here**, and only raised: what
+**Two of the five tones of the add-on are raised here**, and only raised: what
 each one sounds like and why is `signals`' business, told once there. This
 module holds the other half — at which moment each is played, and that the
 lower one belongs to the timeout alone.

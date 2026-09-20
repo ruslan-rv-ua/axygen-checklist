@@ -29,7 +29,8 @@ and a second word over the top of it is noise. Only failures speak, and the
 one that can happen here is a write that did not reach the disk (section 4).
 
 **The one sound the window makes is not a word**: the tree plays the comment
-signal (section 5) on every node it announces whose item carries a comment.
+signal (section 5) whenever it puts up a node whose item carries a comment —
+the selection landing on one, or a save changing the item under it.
 The rule of silence above is about words, which is what would be laid over
 NVDA's own proof; a tone does not stand in the speech queue at all and cuts
 nothing off. What it buys is the one save that the labels cannot show — a
@@ -503,32 +504,37 @@ class _ChecklistWindow(wx.Dialog):
 		# raises the selection event for both, inside these calls. The flag covers
 		# the whole of the work rather than one line of it, because all of it is
 		# the window's own doing and none of it is a step the tester took
-		# (section 5).
+		# (section 5). It is dropped through `finally` for the reason `modal.show`
+		# pairs its own state that way: a flag left standing by an exception would
+		# not break the window, it would silence the signal for the rest of that
+		# window's life — and silence is what the signal exists to be told from.
 		self._filling = True
-		self._showing = None if checklist is None else Standing(checklist, position)
-		self._reset_all.Enable(self._showing is not None)
-		self._path.SetValue(
-			"" if checklist is None or checklist.path is None else str(checklist.path),
-		)
-		self._tree.DeleteAllItems()
-		root = self._tree.AddRoot("")
-		standing = None
-		for section_index, section in enumerate(() if checklist is None else checklist.sections):
-			node = self._tree.AppendItem(root, section.name)
-			# A section stands for its first item, and for nothing when it holds
-			# none; `_Node` says why both are right.
-			self._tree.SetItemData(
-				node,
-				_Node(Position(section_index, 0) if section.items else None, None),
+		try:
+			self._showing = None if checklist is None else Standing(checklist, position)
+			self._reset_all.Enable(self._showing is not None)
+			self._path.SetValue(
+				"" if checklist is None or checklist.path is None else str(checklist.path),
 			)
-			for item_index, item in enumerate(section.items):
-				leaf = self._tree.AppendItem(node, wording.tree_label(item))
-				self._tree.SetItemData(leaf, _Node(Position(section_index, item_index), item))
-				if position == Position(section_index, item_index):
-					standing = leaf
-		self._tree.ExpandAll()
-		self._select(root if standing is None else standing)
-		self._filling = False
+			self._tree.DeleteAllItems()
+			root = self._tree.AddRoot("")
+			standing = None
+			for section_index, section in enumerate(() if checklist is None else checklist.sections):
+				node = self._tree.AppendItem(root, section.name)
+				# A section stands for its first item, and for nothing when it holds
+				# none; `_Node` says why both are right.
+				self._tree.SetItemData(
+					node,
+					_Node(Position(section_index, 0) if section.items else None, None),
+				)
+				for item_index, item in enumerate(section.items):
+					leaf = self._tree.AppendItem(node, wording.tree_label(item))
+					self._tree.SetItemData(leaf, _Node(Position(section_index, item_index), item))
+					if position == Position(section_index, item_index):
+						standing = leaf
+			self._tree.ExpandAll()
+			self._select(root if standing is None else standing)
+		finally:
+			self._filling = False
 
 	def _select(self, standing: wx.TreeItemId) -> None:
 		"""Stand on `standing`, or on the first node when that one is the root.
@@ -572,12 +578,12 @@ class _ChecklistWindow(wx.Dialog):
 		to" wants somewhere to go and a section has one — its first item —
 		unless it is empty (section 5.1).
 
-		**The comment signal sounds from here** (section 5), which is to say on
-		every announcement of a node and not only on a step the tester took: a
-		save from the item dialog announces a node too, and it is the one where
-		the label has no proof to give (section 5.2). That is what buys a rule
-		with no exception in it, and `_filling` keeps the window's own three
-		rebuilds silent without one.
+		**The comment signal sounds from here** (section 5), which is what puts
+		the rule on the node rather than on a step the tester took: `_saved`
+		comes through here as well, and that is the one case where the label
+		has no proof to give (section 5.2). A save is the second case of one
+		rule rather than an exception to it, and `_filling` keeps the window's
+		own three rebuilds silent without needing one either.
 		"""
 		node = self._selected()
 		# Read once and used twice, because the panel and the signal are two
@@ -616,7 +622,7 @@ class _ChecklistWindow(wx.Dialog):
 		NVDA applies in `browseMode.ElementsListDialog.onTreeChar`, down to the
 		bell on a button that is disabled. A disabled button is a section or an
 		empty tree, and section 5.1 refuses it a tone of its own: the add-on has
-		four, they have to be told apart by ear, and a fifth is not worth a node
+		five, they have to be told apart by ear, and a sixth is not worth a node
 		NVDA has already named.
 
 		A chord is left alone. Ctrl+Enter belongs to the accelerator table,
@@ -770,8 +776,8 @@ class _ChecklistWindow(wx.Dialog):
 			# is nowhere to go — but the chord can: an accelerator table hangs
 			# off the dialog and fires whatever the button's state is. The
 			# answer is the bell a disabled button gets from Enter, for the same
-			# reason section 5.1 gives: the add-on has four tones, they have to
-			# be told apart by ear, and this is not worth a fifth.
+			# reason section 5.1 gives: the add-on has five tones, they have to
+			# be told apart by ear, and this is not worth a sixth.
 			wx.Bell()
 			return
 		self._chosen = node.position
