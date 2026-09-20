@@ -26,7 +26,6 @@ still as the one table of section 2, and `wording.py` is where they are.
 """
 
 import importlib
-import pkgutil
 import sys
 import unittest
 from pathlib import Path
@@ -35,17 +34,34 @@ import core
 
 from .support import translation_lookups
 
+CORE = Path(str(core.__path__[0]))
+
+#: Every module of the core, by the file it is written in. One enumeration for
+#: both tests below: a module the walk misses is a module neither rule reaches,
+#: and that is not a thing to have two chances of getting wrong.
+#:
+#: The walk recurses for the same reason `buildVars.pythonSources` does -- the
+#: add-on already has one sub-package, and a sub-package of the core would
+#: otherwise leave both rules at the door without saying so.
+MODULES = sorted(CORE.rglob("*.py"))
+
+
+def _import_name(path: Path) -> str:
+	"""The name `path` imports under, packages' own `__init__` included."""
+	parts = path.relative_to(CORE).with_suffix("").parts
+	return ".".join(("core", *(part for part in parts if part != "__init__")))
+
 
 class CoreImportsNoWx(unittest.TestCase):
 	def test_importing_every_core_module_brings_in_no_wx(self) -> None:
-		for module in pkgutil.iter_modules(core.__path__):
-			importlib.import_module(f"core.{module.name}")
+		for path in MODULES:
+			importlib.import_module(_import_name(path))
 		self.assertFalse("wx" in sys.modules, "a module of the core imports wx")
 
 
 class CoreAsksForNoTranslation(unittest.TestCase):
 	def test_no_core_module_looks_a_string_up_in_a_catalogue(self) -> None:
-		for path in sorted(Path(str(core.__path__[0])).glob("*.py")):
+		for path in MODULES:
 			with self.subTest(module=path.name):
 				self.assertEqual(
 					list(translation_lookups(path)),
