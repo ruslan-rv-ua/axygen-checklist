@@ -27,8 +27,9 @@ touches a file.
 reachable.** wxWidgets leaves a single-line read-only text control out of the
 Tab chain — `AcceptsFocusFromKeyboard()` returns False for one, which is wx
 treating it as a caption rather than a control — while a multi-line read-only
-one stays in. Measured on wxWidgets 3.2.6, the build NVDA 2025.3 ships;
-`SetEditable(False)` in place of the style does the same thing.
+one stays in. Heard on wxWidgets 3.2.8.1, the build NVDA 2026.2 ships, and
+before that on 3.2.6 (NVDA 2025.3), where `SetEditable(False)` in place of the
+style was measured to do the same thing.
 
 Section 3.3.1 weighed the two halves of itself and chose this one. Single-line
 bought the announcement: NVDA reads a dialog out on opening from the static

@@ -30,9 +30,10 @@ name of the control alone, and the tester would have to press an arrow to hear
 the thing the window was opened for.
 
 **Enter on the list is handled explicitly** (section 3.2.2), and there is no
-other way to do it. Measured on wxWidgets 3.2.6, the build NVDA 2025.3 ships:
-of `EVT_CHAR_HOOK`, `EVT_KEY_DOWN` and `EVT_CHAR` bound on the list box, only
-the first is ever given the Return key — the other two never see it, and with
+other way to do it. Heard on wxWidgets 3.2.8.1, the build NVDA 2026.2 ships,
+and measured in full on 3.2.6 (NVDA 2025.3): of `EVT_CHAR_HOOK`, `EVT_KEY_DOWN`
+and `EVT_CHAR` bound on the list box, only the first is ever given the Return
+key — the other two never see it, and with
 no handler at all the key does nothing, since the window has no default button
 for `IsDialogMessage` to press. That is wx ticket #3725, the same one NVDA
 works around in its own Elements List (`browseMode.ElementsListDialog`), and
