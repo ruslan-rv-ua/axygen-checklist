@@ -64,7 +64,8 @@ jobs:
 
   upload_release:
     runs-on: ubuntu-latest
-    # Off a branch push or a pull request only `build` above runs.
+    # The gate is the ref, not the event: off anything but a tag -- a branch push,
+    # a pull request, a dispatch from a branch -- only `build` above runs.
     if: ${{ startsWith(github.ref, 'refs/tags/') }}
     needs: ["build"]
     permissions:
