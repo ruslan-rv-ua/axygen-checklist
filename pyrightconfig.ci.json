@@ -25,6 +25,19 @@
 	// Optional used as if it were not. The core keeps these rules through the local
 	// configuration in pyproject.toml. docs/development.md, "Перевірки перед комітом",
 	// has the measurements behind this.
+	//
+	// The rules pyproject.toml turns on above strict -- reportUnusedCallResult,
+	// reportImportCycles, reportImplicitStringConcatenation and the rest -- are not
+	// inherited here, and that is a decision rather than an omission: pyright's
+	// `extends` would carry them over from pyproject.toml in one line. Measured
+	// against the shell (#23), they report nineteen things, and not one of them points
+	// at a defect: twelve are reportUnusedCallResult on the wx idiom (`sizer.Add(...)`,
+	// `addButton(...)`), four are the cycle pyright sees whenever a module reaches a
+	// sibling through the package (`from . import signals`), two are translator strings
+	// wrapped across lines on purpose, and one is a widget built in a helper that
+	// __init__ calls. NVDA's own configuration turns all five of those rules off,
+	// counting them in the hundreds and thousands. The one finding worth having was a
+	// terminate without @override, and it is in the code instead.
 	"reportMissingTypeStubs": false,
 	"reportUnknownMemberType": false,
 	"reportUnknownVariableType": false,
