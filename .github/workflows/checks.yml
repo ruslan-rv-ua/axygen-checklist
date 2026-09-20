@@ -2,7 +2,14 @@ name: Checks
 
 on:
   push:
-    branches: [ main, develop ]
+    # The release and hotfix branches are here as well as the base ones: a release
+    # finished with `git flow release finish` merges locally, without a pull request,
+    # so the version bump, changelog and readme edits made on that branch
+    # (docs/development.md, section 7) would first be looked at on `main`, after the
+    # merge. Too late to be worth much: `main` moves only through a release or a
+    # hotfix (CLAUDE.md), so a red `main` cannot be put right by an ordinary commit.
+    # `release_checks.yml` waits on the same two branches, with what it adds there.
+    branches: [ main, develop, "release/**", "hotfix/**" ]
   pull_request:
 
 jobs:

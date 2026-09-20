@@ -1,16 +1,24 @@
 {
-	// Used only by CI (see .github/workflows/checks.yml), which checks NVDA's source out
-	// next to the repository first. The configuration in pyproject.toml excludes the shell
+	// Used only by CI -- .github/workflows/checks.yml on every commit and
+	// release_checks.yml before a release -- which checks NVDA's source out next to
+	// the repository first. Which NVDA that is differs between the two, the newest
+	// supported release and the oldest, and nothing in this file depends on which one is
+	// lying there: that is why one configuration serves both runs instead of a copy per
+	// end of the range. The configuration in pyproject.toml excludes the shell
 	// of the add-on, because without that checkout every symbol taken from NVDA is unknown
 	// and strict mode reports the whole file.
 	"typeCheckingMode": "strict",
 	"pythonPlatform": "Windows",
-	// NVDA 2025.3 executes the add-on under Python 3.11. The build environment runs a
-	// newer Python, which must not tempt the add-on into syntax the screen reader cannot
-	// execute. That is the Python of the NVDA named by `addon_lastTestedNVDAVersion` in
-	// buildVars.py -- the same field the workflow derives the source checkout from -- and
-	// it is raised together with that field. docs/development.md, "Перевірки перед
-	// комітом", lists the three things that move as one.
+	// Both ends of the supported range execute the add-on under Python 3.11: NVDA 2025.3,
+	// named by `addon_lastTestedNVDAVersion` in buildVars.py, and NVDA 2025.1, named by
+	// `addon_minimumNVDAVersion` beside it. The build environment runs a newer Python,
+	// which must not tempt the add-on into syntax the screen reader cannot execute.
+	//
+	// One number covers both runs only while the two releases agree on it. The day a
+	// raised `addon_lastTestedNVDAVersion` brings a newer Python than the floor's, this
+	// cannot become a second value here -- a file has one `pythonVersion` -- and the
+	// floor needs a configuration of its own. docs/development.md, "Перевірки перед
+	// комітом", lists what moves with which field.
 	"pythonVersion": "3.11",
 	"include": ["addon"],
 	"extraPaths": ["./addon", "../nvda/source"],

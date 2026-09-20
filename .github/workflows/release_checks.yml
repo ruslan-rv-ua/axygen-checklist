@@ -1,0 +1,58 @@
+name: Release checks
+
+# What is checked once per release rather than once per commit.
+#
+# `checks.yml` type checks the add-on against the newest NVDA it is built for. That is
+# one end of what `manifest.ini` promises; the other is `addon_minimumNVDAVersion`, the
+# oldest NVDA allowed to install it, and on an ordinary commit nothing looks at that end
+# at all. Why the gap matters is in docs/development.md, section 4, and in
+# `tools/nvda_ref.py`, which makes the same argument for the other end of the range.
+#
+# What belongs here rather than there is the moment. A release or hotfix branch is the
+# last point at which a mistake of this kind is still cheap to fix and the first at which
+# it can reach anyone, and waiting for it spares every ordinary commit a second shallow
+# clone of NVDA. The cost is that the branch has to be pushed: a release finished locally
+# never reaches this file. docs/development.md, section 7, puts that push in the
+# checklist.
+
+on:
+  push:
+    branches: ["release/**", "hotfix/**"]
+
+  # Those branches are the scheduled moment; this is the unscheduled one -- checking the
+  # floor right after touching NVDA's API, without waiting for a release to ask.
+  workflow_dispatch:
+
+jobs:
+  minimum_nvda:
+    name: Type check against the oldest supported NVDA
+    # Windows, for the reason `checks.yml` gives.
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v10.0.1
+        with:
+          enable-cache: true
+
+      - name: Install dependencies
+        run: uv sync
+
+      # `pyrightconfig.ci.json` is the file `checks.yml` uses, unchanged and uncopied:
+      # nothing in it depends on which end of the range is lying in ../nvda. What would
+      # end that, and what to do when it does, is written where those numbers are --
+      # docs/development.md, section 4.
+      #
+      # Which NVDA to clone comes from `addon_minimumNVDAVersion` in buildVars.py, never
+      # from a number written here, which would drift away from the field that sets it.
+      # `bash` is here to fail fast, as it is in `checks.yml`.
+      - name: Type check the add-on against NVDA's source
+        shell: bash
+        run: |
+          ref="$(uv run python -m tools.nvda_ref minimum)"
+          echo "Checking against NVDA $ref"
+          git clone --depth 1 --branch "$ref" https://github.com/nvaccess/nvda.git ../nvda
+          uv run pyright --project pyrightconfig.ci.json

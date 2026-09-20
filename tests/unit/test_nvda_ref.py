@@ -5,16 +5,20 @@
 
 """Guards the rule that turns a version into the NVDA source CI checks against.
 
-`tools/nvda_ref.py` maps `addon_lastTestedNVDAVersion` to the git ref that
-holds that release's source, and `checks.yml` clones what it prints. What the
-rule is, and why it takes the shape it does, is said once, in that module; what
+`tools/nvda_ref.py` maps the two versions in `buildVars.py` to the git refs
+that hold their source, and the workflows clone what it prints. What the rule
+is, and why it takes the shape it does, is said once, in that module; what
 stands here are the examples, because a ref shape read off NV Access's tags is
 the kind of thing that gets tidied into something more regular by someone who
 never saw the tags.
 
-The last test looks at the real `buildVars.py`. A version the rule cannot read
+Two of the tests look at the real `buildVars.py`. A version the rule cannot read
 would take CI down at the clone, with a message about a ref rather than about
 the field that names it; here it fails before the commit, at the field.
+
+The command line is here for one reason: it decides which end of the supported
+range a workflow checks, and getting that wrong is silent. A run that meant to
+name the floor and named nothing checks the ceiling twice and passes.
 
 Nothing here reaches the network. Whether a ref exists is NV Access's answer to
 give, and `git clone --branch` asks it loudly enough.
@@ -22,7 +26,7 @@ give, and `git clone --branch` asks it loudly enough.
 
 import unittest
 
-from tools.nvda_ref import last_tested_ref, release_ref
+from tools.nvda_ref import last_tested_ref, minimum_ref, ref_named_by, release_ref
 
 
 class ReleaseRef(unittest.TestCase):
@@ -45,9 +49,31 @@ class ReleaseRef(unittest.TestCase):
 					release_ref(version)
 
 
-class TheVersionInBuildVars(unittest.TestCase):
-	def test_is_one_the_rule_can_read(self) -> None:
+class TheVersionsInBuildVars(unittest.TestCase):
+	def test_the_last_tested_one_is_one_the_rule_can_read(self) -> None:
 		# Raising is the failure, and there is nothing to assert beyond it. Asserting on
 		# the shape of what comes back would only restate the regex that let it through,
 		# and whether the ref exists is NV Access's answer, asked at the clone.
 		last_tested_ref()
+
+	def test_the_minimum_one_is_one_the_rule_can_read(self) -> None:
+		# The floor is checked for the same reason as the ceiling, and by the same rule:
+		# the release workflow clones this ref too (docs/development.md, section 4).
+		minimum_ref()
+
+
+class TheCommandLine(unittest.TestCase):
+	def test_names_the_last_tested_end_when_asked_for_nothing(self) -> None:
+		self.assertEqual(ref_named_by([]), last_tested_ref())
+
+	def test_names_the_floor_when_asked_for_it(self) -> None:
+		self.assertEqual(ref_named_by(["minimum"]), minimum_ref())
+
+	def test_refuses_anything_else_instead_of_falling_back(self) -> None:
+		# Falling back to the default here is the failure worth guarding: the run would
+		# check the ceiling a second time and report success, having never looked at the
+		# floor it was called for.
+		for arguments in (["Minimum"], ["--minimum"], ["maximum"], ["minimum", "extra"], [""]):
+			with self.subTest(arguments=arguments):
+				with self.assertRaises(SystemExit):
+					ref_named_by(arguments)
