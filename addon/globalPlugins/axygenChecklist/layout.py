@@ -5,9 +5,14 @@
 
 """The pieces of layout `guiHelper` does not do, and why they are done here.
 
-Both are cases where the helper does most of the work and stops one step short,
-and both are built out of its own constants, so that a hand-made pair and a
-`guiHelper` one sit exactly the same distance apart.
+Every one of them is a case where the helper does most of the work and stops one
+step short, and each is built out of its own constants, so that a hand-made pair
+and a `guiHelper` one sit exactly the same distance apart.
+
+Two of the four are about notebook pages, which `guiHelper` has never had to
+draw: its own dialogs have no tabs. `page_contents` carries the one cast the
+window needs and the reason for it; `inside_page` puts a built page inside the
+border every window of the add-on stands in.
 
 `guiHelper.associateElements` picks where a label goes from the **type** of the
 control it names: beside it for a `wx.TextCtrl`, a `wx.ComboBox` or a button,
@@ -46,6 +51,7 @@ which in a vertical sizer makes every item as wide as the widest of them.
 """
 
 from collections.abc import Callable, Sequence
+from typing import cast
 
 import wx
 from gui import guiHelper
@@ -71,6 +77,27 @@ def label_above[ControlT: wx.Control](
 	sizer.AddSpacer(guiHelper.SPACE_BETWEEN_ASSOCIATED_CONTROL_VERTICAL)
 	sizer.Add(control, flag=wx.EXPAND, proportion=1)
 	return sizer, control
+
+
+def page_contents(page: wx.Panel) -> guiHelper.BoxSizerHelper:
+	"""A `BoxSizerHelper` that builds the contents of a notebook page.
+
+	The cast is the whole of it, and it is here rather than at each page so
+	that the reason is written once. `BoxSizerHelper.__init__` declares its
+	parent as `wx.Dialog`, and only **one** of its methods needs that much:
+	`addDialogDismissButtons` calls `CreateButtonSizer` on the parent, which
+	belongs to a dialog. Everything a page asks of it — `addItem`,
+	`addLabeledControl` — reaches the parent through a weak reference and
+	wants no more than a `wx.Window`.
+
+	A page never adds dismiss buttons, and cannot: "Close" belongs to the
+	dialog, under both tabs (section 5). So the declaration is narrower than
+	the contract this use needs, and the cast says which of the two is being
+	relied on. Whoever gives a page a dismiss button will get `AttributeError`
+	from wx rather than a type error from here — which is the cost of the cast,
+	and it is named so that it is not discovered as a surprise.
+	"""
+	return guiHelper.BoxSizerHelper(cast("wx.Dialog", page), orientation=wx.VERTICAL)
 
 
 def inside_page(page: wx.Panel, contents: guiHelper.BoxSizerHelper) -> None:

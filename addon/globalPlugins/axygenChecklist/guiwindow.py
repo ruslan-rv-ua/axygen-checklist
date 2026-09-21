@@ -384,7 +384,7 @@ class _ChecklistWindow(DpiScalingHelperMixinWithoutInit, wx.Dialog):
 		# dialog, and the order it is created in is still the Tab order the
 		# tester walks — within the page, which is where the rule of section 6
 		# about a label naming the control after it is measured.
-		run_contents = guiHelper.BoxSizerHelper(run_page, orientation=wx.VERTICAL)
+		run_contents = layout.page_contents(run_page)
 		run_contents.addItem(self._build_browse_row(run_page), flag=wx.EXPAND)
 		self._reset_all = wx.Button(
 			run_page,
@@ -540,7 +540,7 @@ class _ChecklistWindow(DpiScalingHelperMixinWithoutInit, wx.Dialog):
 		a control that was just changed, and that is the proof; a second word
 		over the top of it is the noise section 5 keeps out.
 		"""
-		contents = guiHelper.BoxSizerHelper(page, orientation=wx.VERTICAL)
+		contents = layout.page_contents(page)
 		auto_advance_box = contents.addItem(
 			wx.CheckBox(
 				page,
