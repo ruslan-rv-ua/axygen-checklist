@@ -6,10 +6,12 @@
 """Entry point of the Axygen Checklist add-on: the global commands.
 
 The behaviour is specified in docs/requirements.md. What this module holds is
-the half of it that cannot be unit tested — gestures, series of presses, speech
-— and it holds as little of that as it can: where the tester is and where a
-move takes them is worked out in `core.navigation`, and the words are in
-`wording`.
+the half of it that cannot be unit tested — gestures, series of presses,
+speech — and it holds as little of that as it can. The rules of section 4
+live in `core.run`: every command here is a command of the one `Run` this
+plugin holds, and what comes back is a list of events in the order they
+happened. This module turns that list into words, tones and the choice of a
+channel, and that is the whole of its half (docs/adr/0001).
 
 **No command here changes the system focus from the first press of a global
 combination.** That is the invariant of section 1, and the five windows of the
@@ -23,7 +25,9 @@ only `scriptHandler.getLastScriptRepeatCount()`: NVDA runs the script on every
 press of a series without waiting for the series to end, and the interval it
 counts is the user's own `multiPressTimeout`. Measuring the time between calls
 ourselves is forbidden, and would hard-code a setting that belongs to the
-screen reader. The command mode is not a series and does not ask (section 6);
+screen reader. The count is read at the moment of the press and handed to the
+run as one boolean — whether this press is a jump — which is all the run needs
+to know of it. The command mode is not a series and does not ask (section 6);
 `commandmode` counts its own three seconds and says why.
 
 **Every script here drops the command mode before it does anything else**, and
@@ -51,26 +55,29 @@ someone else's dialog has not executed, so consuming the mode on its behalf
 would be inventing an action. The mode then ends the way it would have anyway,
 on its own timer.
 
-**The position reaches the disk whenever a command moves it.** Section 2 keeps
-it in `state.json` — navigation included, not only where a status is being
-written beside it — so that a restart of the screen reader puts the tester back
-where they stopped. `_remember` is the one place that writes, and that is the
-whole of the discipline: there is no other moment at which the file is brought
-up to date, as there is none for the checklist. Reading the position back is
-not a change and writes nothing; `_restore` says what that buys.
-
-**A command that changes data writes first and speaks second** (section 4).
-The two files differ in what a failed write costs and so in what is said about
-it: losing the position costs the place and is answered with a line in the log,
-while losing a verdict costs the run and refuses the command out loud, every
-time. What the tester hears then is one phrase and nothing after it.
+**One narrator, and it is where the channel is chosen.** `_narrate` walks the
+events of an answer and says each in the order the run put them, which is the
+order section 4 prescribes: the file is already written by the time the list
+comes back, so speech cannot get ahead of the disk; a failed write is the only
+event of its list, so one phrase and nothing after it is the shape of the
+answer rather than a discipline of the callers; the word for the status stands
+before the end of the run before the next item because that is how they
+happened. The one thing the narrator is told that the run does not know is
+`after_window`: whether a window of the add-on has just closed (section 6).
+Then a phrase goes through `modal.message` rather than `ui.message`, or NVDA
+announcing the window that got the focus back would cut it off; and the end
+of the run, which is a tone **and** a phrase, waits whole through `modal.later`,
+or the tone would sound a window announcement ahead of its words. The six
+fixed sentences of the add-on stand in the narrator and nowhere else; what is
+built out of data is `wording`'s.
 
 **The restore happens on construction; only its failures wait.** Reading the
 file is the first thing this plugin does, so that a reload of the plugins
 (`NVDA+Ctrl+F3`) comes back holding the same checklist. What cannot happen that
 early is speech: at start-up NVDA is still announcing itself and the window in
-focus, and a message spoken into that would be cut off by it. So a failure is
-kept until `core.postNvdaStartup`, which NVDA queues into its own loop once the
+focus, and a message spoken into that would be cut off by it. So the answer of
+`Run.restore` — empty when it went well, one refusal when it did not — is kept
+until `core.postNvdaStartup`, which NVDA queues into its own loop once the
 initial focus has been reported.
 
 That action fires once per run of NVDA, so a plugin built after it — a reload,
@@ -89,19 +96,20 @@ rather than to this object and therefore has to be taken back out of it when
 NVDA is done with the plugin. Both ways end in the same call, and both carry
 the same blocking: the menu stays reachable while a window of the add-on is
 open, so without it a second window would be opened from there over the first.
-The window itself is `guiwindow`'s, and it is modal like the other four — so
-while it stands, nothing here runs (section 3.3.1).
+The window is handed the run and asks it for everything it does; the one thing
+that comes back out is "Move to", because it has to outlive the window
+(section 5.1). The window is `guiwindow`'s, and it is modal like the other four
+— so while it stands, nothing here runs (section 3.3.1).
 
 **A checklist arrives two ways, and they are one operation.** Start-up reads
 the path out of `state.json`; the `O` key of the command mode asks the tester
-for one (section 3.2.2). What differs is where the path came from and what is
-said afterwards — nothing else, which is why `_adopt` holds the part in the
-middle. A start-up that finds its file gone does both in turn: it says so, and
-then opens the very dialog `O` would have (section 2). The GUI of section 5
-will be the third way in and the same operation again.
+for one (section 3.2.2). Both are `Run.open` underneath, and what differs is
+where the path came from and what is done with a refusal: spoken in four words
+when nobody asked, shown with the field, the item and the value when the tester
+has just pressed "Open" (sections 2 and 4). `Browse...` in the window is the
+third way in and the same call again.
 """
 
-import dataclasses
 from collections.abc import Callable
 from pathlib import Path
 from typing import override
@@ -135,10 +143,30 @@ from . import (
 	signals,
 	wording,
 )
-from .core import checklist, navigation, progress, session, status
-from .core.checklist import Checklist, Item, Section
-from .core.navigation import Direction, Position, Step
-from .core.session import Session
+from .core import status
+from .core.checklist import Item
+from .core.navigation import Direction, Position
+from .core.progress import Progress
+from .core.run import (
+	Answer,
+	Boundary,
+	ChecklistGone,
+	ChecklistReset,
+	Finished,
+	Here,
+	Landed,
+	NoChecklist,
+	NoItems,
+	PlaceNotSaved,
+	Recorded,
+	Refused,
+	Run,
+	Saved,
+	SectionProgress,
+	SectionReset,
+	Unreadable,
+	WriteFailed,
+)
 
 addonHandler.initTranslation()
 
@@ -184,23 +212,6 @@ _MODE_KEYS = {
 }
 
 
-@dataclasses.dataclass(frozen=True)
-class _RestoreFailure:
-	"""What a restore at start-up could not do, until there is anyone to hear it.
-
-	There is always something to say — section 4 gives every way a checklist can
-	fail to load its own short sentence — so the message is not optional, and a
-	restore that went well has no `_RestoreFailure` at all rather than an empty
-	one. Only one failure also owes a window: the file named in `state.json` is
-	no longer on the disk, so there is nothing to work with until another path
-	is given, and section 2 has the add-on ask for one. A file that is there and
-	broken is not that case and opens no window (section 4).
-	"""
-
-	message: str
-	choose_a_file: bool = False
-
-
 def _state_file() -> Path:
 	"""Where the position is kept between runs of NVDA (section 2).
 
@@ -226,6 +237,21 @@ def _digit_status(gesture: inputCore.InputGesture) -> str | None:
 	return None
 
 
+def _hold(action: Callable[[], None], after_window: bool) -> None:
+	"""Do `action` now, or on the turn of the event loop a closing window needs.
+
+	What the narrator does with the two things that are not a bare phrase of
+	the add-on's — a tone, and a tone with a phrase attached (section 6). A
+	phrase on its own has `modal.message` for the same moment; these have to
+	wait as a whole, or the tone would be heard a window announcement ahead
+	of the words it belongs to.
+	"""
+	if after_window:
+		modal.later(action)
+	else:
+		action()
+
+
 class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 	"""Global plugin holding the checklist commands."""
 
@@ -235,38 +261,20 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 
 	def __init__(self):
 		super().__init__()
-		#: The checklist the commands work on, or None while none is loaded.
-		#: Loading it is the business of the file dialog and of `state.json`;
-		#: until one of them puts it here, every command says so (section 4).
-		self._checklist: Checklist | None = None
-		#: Where the tester is, and None when there is nowhere to stand.
-		#:
-		#: Optional rather than a position that starts at the top, because a
-		#: checklist with no items in it at all is a *valid* file: section 2
-		#: requires at least one section and never a minimum of items. Whatever
-		#: loads a checklist has to work out where a run starts and may find
-		#: that there is no answer; asserting `Position(0, 0)` instead would
-		#: read past the end of an empty section, and an exception inside a
-		#: global plugin is exactly the mid-session silence section 2 exists to
-		#: prevent.
-		self._position: Position | None = None
-		#: Where the current series of presses started. Section 3.1: the single
-		#: press has already moved by the time the second press arrives, so a
-		#: jump measured from the item it landed on would skip a whole section.
-		#: Scratch for the length of one series, and read only on a press that
-		#: has a press of its own before it.
-		self._anchor = Position(0, 0)
+		#: The one run of the plugin's life: the checklist or its absence, the
+		#: position, the anchor of a series and the file the position is kept
+		#: in between runs of NVDA. Every command is a command of it, and
+		#: every answer comes back as events for `_narrate` to say.
+		self._run = Run(_state_file())
 		#: The temporary layer the rare commands live behind (section 3.2.2).
 		#: Not armed until `NVDA+Alt+O` arms it, and never arming itself.
 		self._mode = commandmode.CommandMode(self, _MODE_KEYS)
-		#: Where the position between runs of NVDA is kept (section 2).
-		self._state = _state_file()
 		#: The add-on's entry in NVDA's Tools menu, and None when there was
 		#: nowhere to put one. Kept so that `terminate` can take it away again.
 		self._menu_item = self._add_to_tools_menu()
-		#: What the restore could not do, until there is anyone to hear it. None
-		#: when it went well, which section 2 answers with silence.
-		self._startup_failure = self._restore()
+		#: What the restore could not do, until there is anyone to hear it.
+		#: Empty when it went well, which section 2 answers with silence.
+		self._startup: list[Answer] = self._run.restore()
 		postNvdaStartup.register(self._announce_restore)
 		log.info("Axygen Checklist loaded")
 
@@ -356,48 +364,6 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 		except RuntimeError:
 			log.debug("the Tools menu had gone before the add-on's entry in it", exc_info=True)
 
-	def _restore(self) -> _RestoreFailure | None:
-		"""Pick the run up where the last one left it, and say what stopped it.
-
-		Section 2: the path and the pair of indices come out of `state.json`,
-		and a restart of NVDA lands the tester back on the item they stopped
-		on. Nothing is said when that works — no command was given, and NVDA is
-		mid-sentence about itself at this moment anyway. What comes back is what
-		a failure has earned, for `_announce_restore` to make good on later.
-
-		**Nothing is written back here**, whether this went well or badly. A
-		restore reads the position rather than changing it, and section 2 has
-		the file written on a change; a failure has all the more reason to
-		leave it alone, since the path in it is where the file dialog starts
-		browsing (section 3.2.2) and that is wanted precisely when the file it
-		names has gone. Even a position the file has outgrown is left standing:
-		the next move writes the real one, and until then a checklist broken
-		only for the moment can still give the tester their place back.
-		"""
-		remembered = session.load(self._state)
-		if remembered.checklist is None:
-			return None
-		try:
-			loaded = checklist.load(remembered.checklist)
-		except FileNotFoundError:
-			return _RestoreFailure(
-				# Translators: Spoken when NVDA starts and the checklist that was open
-				# last time is no longer where it was.
-				_("Checklist file not found"),
-				choose_a_file=True,
-			)
-		except OSError:
-			# Everything else that stops a file being read at all: no permission,
-			# a drive that is not there, a name Windows will not open. Section 2
-			# gives them the same four words as a broken file, and the log is
-			# where the difference between them survives.
-			log.error(f"could not read the checklist at {remembered.checklist}", exc_info=True)
-			return _RestoreFailure(wording.spoken_refusal())
-		except checklist.ChecklistError as refusal:
-			return _RestoreFailure(wording.spoken_refusal(refusal.problem))
-		self._adopt(loaded, remembered.position_in(remembered.checklist))
-		return None
-
 	def _announce_restore(self) -> None:
 		"""Say what the restore could not do, now that NVDA can be heard.
 
@@ -408,7 +374,9 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 		section 2 answers it with this warning and then the file dialog —
 		because there is nothing to work with at all until another path is
 		given, and that dialog is what the tester would open with their first
-		command anyway.
+		command anyway. The two are told apart here rather than in the
+		narrator, because the window is this method's to open, and the phrase
+		has to precede it.
 
 		**The warning that comes with a window goes out through `modal.message`**,
 		and that was found by ear rather than reasoned out: spoken through
@@ -421,21 +389,23 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 		foreground event has done its cancelling, and at `Spri.NOW`, so nothing
 		queued in front of it stands in its way. The same call carries it to
 		braille, which matters here more than anywhere: this message is the
-		whole explanation of a window the tester did not ask for.
+		whole explanation of a window the tester did not ask for. So the
+		narrator is told `after_window` although the window is about to open
+		rather than just closed: the mechanism is the same one, and section 2
+		says so.
 
 		A failure with no window keeps `ui.message` (section 4). There is
 		nothing about to cancel it, and delaying it would buy nothing.
 		"""
-		failure = self._startup_failure
-		if failure is None:
-			return
+		answer = self._startup
 		# Cleared before anything is said, so that nothing here can be owed twice.
-		self._startup_failure = None
-		if not failure.choose_a_file:
-			ui.message(failure.message)
-			return
-		modal.message(failure.message)
-		self._choose_checklist()
+		self._startup = []
+		match answer:
+			case [ChecklistGone()]:
+				self._narrate(answer, after_window=True)
+				self._choose_checklist()
+			case _:
+				self._narrate(answer)
 
 	@script(
 		description=_(
@@ -447,7 +417,9 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 	@blockAction.when(blockAction.Context.MODAL_DIALOG_OPEN)
 	def script_nextItem(self, gesture: inputCore.InputGesture) -> None:
 		self._mode.disarm()
-		self._navigate(Direction.FORWARD)
+		self._narrate(
+			self._run.navigate(Direction.FORWARD, jump=scriptHandler.getLastScriptRepeatCount() > 0),
+		)
 
 	@script(
 		description=_(
@@ -459,7 +431,9 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 	@blockAction.when(blockAction.Context.MODAL_DIALOG_OPEN)
 	def script_previousItem(self, gesture: inputCore.InputGesture) -> None:
 		self._mode.disarm()
-		self._navigate(Direction.BACKWARD)
+		self._narrate(
+			self._run.navigate(Direction.BACKWARD, jump=scriptHandler.getLastScriptRepeatCount() > 0),
+		)
 
 	@script(
 		description=_(
@@ -476,8 +450,12 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 		# therefore never one accidental double tap away from anything
 		# destructive. Resetting a section lives behind the command mode and a
 		# Yes/No dialog instead.
+		#
+		# Auto-advance is read now and handed over as a value (section 4): the
+		# option is NVDA's, a profile switch changes it without anything here
+		# being told, and `preferences` says why it may not be held anywhere.
 		self._mode.disarm()
-		self._record_status(status.toggled)
+		self._narrate(self._run.toggle(preferences.auto_advance()))
 
 	@script(
 		description=_(
@@ -489,12 +467,9 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 	@blockAction.when(blockAction.Context.MODAL_DIALOG_OPEN)
 	def script_readItem(self, gesture: inputCore.InputGesture) -> None:
 		self._mode.disarm()
-		standing = self._standing()
-		if standing is None:
-			return
-		loaded, position = standing
+		answer = self._run.here()
 		if scriptHandler.getLastScriptRepeatCount() == 0:
-			self._speak(loaded, position)
+			self._narrate(answer)
 			return
 		# The second press, and the heavy end of the series (section 3.3): the
 		# window may not open on the first, which would take the focus and put
@@ -507,11 +482,16 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 		# There is no third press to answer: the window is modal, so every
 		# command of the add-on is blocked behind it, and `modal.show` clears
 		# the series besides (section 3.3.1).
-		item = navigation.item_at(loaded, position)
-		itemdialog.show(
-			item,
-			lambda status_value, comment: self._save_item(loaded, item, status_value, comment),
-		)
+		match answer:
+			case [Here(item, _)]:
+				itemdialog.show(
+					item,
+					lambda status_value, comment: self._saved(item, status_value, comment),
+				)
+			case _:
+				# Nowhere to stand, and the reason is said again: the first press
+				# said it too, and this press has just cut that off.
+				self._narrate(answer)
 
 	@script(
 		description=_(
@@ -557,9 +537,9 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 			return
 		# The honest repeat of section 4: a digit assigns the status outright and
 		# may be pressed as often as the tester likes, where the space bar would
-		# toggle away from it. So nothing here asks whether the status is already
-		# the one being assigned — the write and the word happen either way.
-		self._record_status(lambda _current: value)
+		# toggle away from it. Nothing here asks whether the status is already
+		# the one being assigned, and neither does the run.
+		self._narrate(self._run.assign(value, preferences.auto_advance()))
 
 	@script(
 		description=_(
@@ -576,10 +556,10 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 		# is a tone instead of a window, and nothing else.
 		#
 		# One of the two commands that ask for no checklist, and this one is how
-		# a checklist arrives at all. `_standing` is not called, and nothing
-		# here says "No checklist loaded" — that would put the only way in
-		# behind having already come in. `A` is the other, for a reason of its
-		# own (section 4): what it toggles does not live in the file.
+		# a checklist arrives at all. The run is not asked where it stands, and
+		# nothing here says "No checklist loaded" — that would put the only way
+		# in behind having already come in. `A` is the other, for a reason of
+		# its own (section 4): what it toggles does not live in the file.
 		self._mode.disarm()
 		self._choose_checklist()
 
@@ -597,7 +577,7 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 		# anyone who would rather give it a key. Without that, moving a command
 		# into the mode would take its rebinding away along with its hotkey.
 		self._mode.disarm()
-		self._speak_progress()
+		self._narrate(self._run.progress())
 
 	@script(
 		description=_(
@@ -612,25 +592,29 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 		# 1 as it applies here: the window costs a deliberately armed mode, so
 		# nobody working in someone else's window reaches it by accident. The
 		# dialog is the confirmation entire — no state waits for a second press
-		# and no second timer runs over the first (section 3.2.2). The mode is
-		# dropped now, as by any key of it, and the answer arrives after this
-		# script has long returned; what it is about is settled here, while
-		# the tester still stands in the section they asked about.
+		# and no second timer runs over the first (section 3.2.2).
+		#
+		# The run is asked where it stands before the question is asked, so
+		# that a tester with nowhere to stand hears why instead of a question
+		# about nothing. Which section the Yes will reset is settled by the run
+		# when the answer arrives, and that is the section they asked about:
+		# every command is blocked while the dialog stands (section 3.3.1), so
+		# nothing can have moved the position in between.
 		self._mode.disarm()
-		standing = self._standing()
-		if standing is None:
-			return
-		loaded, position = standing
-		section = navigation.section_at(loaded, position)
-		modal.confirm(
-			_(
-				# Translators: The question asked before the current section of the checklist
-				# is reset, that is every item put back to not checked and every comment erased.
-				"Reset the section? Every status and comment in the section will be erased. "
-				"This cannot be undone.",
-			),
-			on_yes=lambda: self._reset_section(loaded, section),
-		)
+		answer = self._run.here()
+		match answer:
+			case [Here()]:
+				modal.confirm(
+					_(
+						# Translators: The question asked before the current section of the checklist
+						# is reset, that is every item put back to not checked and every comment erased.
+						"Reset the section? Every status and comment in the section will be erased. "
+						"This cannot be undone.",
+					),
+					on_yes=lambda: self._narrate(self._run.reset_section(), after_window=True),
+				)
+			case _:
+				self._narrate(answer)
 
 	@script(
 		description=_(
@@ -646,11 +630,16 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 		# guess which one happened — a total rule that turns on the state of the
 		# data, as section 3.2.1 already has.
 		self._mode.disarm()
-		standing = self._standing()
-		if standing is None:
-			return
-		loaded, position = standing
-		found = navigation.item_at(loaded, position).fragments
+		answer = self._run.here()
+		match answer:
+			case [Here(item, _)]:
+				self._copy_fragment_of(item)
+			case _:
+				self._narrate(answer)
+
+	def _copy_fragment_of(self, item: Item) -> None:
+		"""Put a fragment of `item` in the clipboard, or say that it has none (section 3.2.2)."""
+		found = item.fragments
 		if not found:
 			# Worded away from NVDA's own "Unable to copy", which the Ukrainian
 			# catalogue renders as "there is nothing to copy": without that, the
@@ -744,453 +733,88 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 		self._show_window()
 
 	def _show_window(self) -> None:
-		"""Show the window, on the checklist and the place the commands work on.
+		"""Show the window on the run, whichever way in was used.
 
-		Section 5: whichever way in was used, what the window is given is what
-		every command is given — the checklist in hand and where the tester
-		stands in it — so the node that opens selected is the item the next
-		command would be about. Both may be None, and neither is a refusal: the
-		window opens on an empty tree, and `guiwindow.show` says why.
-
-		Nothing is remembered here, and the callbacks are why nothing needs to
-		be: selecting in the tree is a view and moves no one (section 5), and
-		everything that does change something comes back out as a call. "Move
-		to" arrives once the window has closed, which is what makes `_move_to`
-		speak late; a save from the item dialog and a file picked with
-		`Browse...` arrive while it still stands.
+		Section 5: the window is handed the run itself — the checklist in hand
+		and where the tester stands in it, which may both be absent, and
+		neither is a refusal: the window opens on an empty tree, and
+		`guiwindow.show` says why. Everything the window changes it asks the
+		run for directly, and decides for itself what silence section 5 owes
+		it; "Move to" alone comes back out as a call, because it arrives once
+		the window has closed and has to be spoken late (section 6).
 		"""
-		guiwindow.show(
-			self._checklist,
-			self._position,
-			self._move_to,
-			self._save_from_window,
-			self._browse,
-			self._reset_all,
-			self._cycle_from_window,
-		)
-
-	def _browse(self, path: Path) -> guiwindow.Browsed:
-		"""Open the file picked with `Browse...`, and say what became of it (section 5).
-
-		The second way to open a checklist, and `_load` is the first thing it
-		reaches: the file, the position it lands on and the write to
-		`state.json` are settled there, once, for this and for the `O` key
-		alike (section 3.2.2).
-
-		What differs is everything after, and both halves are the window's rule
-		of silence (section 5.3). Nothing is spoken — neither the item landed
-		on nor the fact that a file opened — because the window still stands
-		and NVDA has its own proof to give; and the refusal is handed back
-		rather than shown, because the window it belongs over is the GUI window
-		rather than `gui.mainFrame` (section 6).
-
-		`state.json` is read here rather than carried in from the window: the
-		window knows where the tester stands in the checklist, and this needs
-		what the **file** remembers about the one they just picked. Nothing can
-		have changed it in between — the add-on is the only writer, and its
-		commands are blocked while the window stands (section 3.3.1).
-		"""
-		answer = self._load(path, session.load(self._state))
-		if isinstance(answer, str):
-			return answer
-		return guiwindow.Standing(answer, self._position)
+		guiwindow.show(self._run, self._move_to)
 
 	def _move_to(self, found: Position) -> None:
 		"""Stand where the window was asked to move to (section 5.1).
 
-		The one action of the window that moves the position, and it is an
-		ordinary move once it gets here: the position reaches `state.json` at
-		once and the item is spoken, exactly as after a navigation key.
-
-		Two things about it are the window's. The section is named, because
-		this is a jump and the most deliberate kind — the same reason it is
-		named after a double press and after a file has just been opened
-		(sections 3.1 and 3.2.2). And the phrase goes out late: the window has
-		just handed the focus back, and NVDA is about to announce the window
-		that took it (section 6).
-
-		`_standing` is not asked, and would answer the wrong question: what the
-		window handed back is a place in the checklist it was built from, and
-		nothing could have changed either while it stood.
+		The one action of the window that moves the position, and an ordinary
+		move once it gets here: the position reaches `state.json` at once and
+		the item is spoken with the name of its section, as after a jump. The
+		phrase goes out late: the window has just handed the focus back, and
+		NVDA is about to announce the window that took it (section 6).
 		"""
-		loaded = self._checklist
-		if loaded is None:
-			# Unreachable: a window with no checklist has an empty tree, and an
-			# empty tree has nowhere to move to.
-			log.error("the window asked for a move with no checklist open")
-			return
-		self._land(loaded, found, name_the_section=True, say=modal.message)
+		self._narrate(self._run.move_to(found), after_window=True)
 
-	def _save_from_window(self, item: Item, status_value: str, comment: str) -> None:
-		"""Write what the item dialog collected, and let NVDA say what moved.
+	def _saved(self, item: Item, status_value: str, comment: str) -> None:
+		"""The item dialog was saved from `NVDA+Alt+I`: write, and say what moved.
 
-		The far side of Enter on the tree (section 5.2). It is `_save_item`
-		with one thing taken away: the phrase naming what changed. The window
-		is still standing, and while it stands the add-on says nothing of its
-		own (section 5) — NVDA announcing the node of the tree with its new
-		prefix is the proof, and a second word over the top of it is noise.
-
-		What is left is what section 4 will not let go: a write that did not
-		reach the disk speaks, every time, and the end of a run speaks because
-		it is news about the run rather than about the window.
-
-		`self._checklist` rather than a checklist handed in: nothing can have
-		replaced it while the window stood, because every command is blocked
-		behind it (section 3.3.1).
+		Whether anything is written, which words are owed and whether the run
+		has just ended are the run's to settle (section 3.3.1); everything it
+		answers goes out late, because the window has just handed the focus
+		back (section 6). A save from the tree of the window is the same call
+		made by the window, which owes different silences (section 5.2).
 		"""
-		loaded = self._checklist
-		if loaded is None:
-			# Unreachable: the dialog is opened from a node of the tree, and a
-			# tree with nodes was built from a checklist.
-			log.error("the window saved an item with no checklist open")
-			return
-		self._save_item(loaded, item, status_value, comment, name_the_change=False)
-
-	def _cycle_from_window(self, item: Item) -> None:
-		"""Give the item the next status of the cycle (section 5.1).
-
-		The fourth way a status is set (section 3.2), and the one that made
-		section 7.3 take its old refusal back: it adds a rule for what comes
-		next, not a place where `status` is written. The three pieces it leans
-		on are the three the other ways lean on — `_write` puts the change on
-		the disk, the dictionary supplies the word, `_announce_completion`
-		answers for the run — and none of section 4 is restated here.
-
-		It says nothing of the status, and the rule of silence holds here with no
-		exception (section 5). The window updates the label of the node
-		afterwards, and that label changes **under the focus**: NVDA takes it
-		for a change of name on the focused node and reads the node again, new
-		prefix first. Saying the word as well was what this did at first, and a
-		real build showed what it cost — the status spoken twice, once alone and
-		once inside the node NVDA had reread.
-
-		What is left is what section 4 will not let go, and it is the same pair
-		the dialog save keeps: a write that did not reach the disk speaks, every
-		time, and the end of a run speaks because it is news about the run
-		rather than about the window.
-
-		Auto-advance is not called, for the reason the item dialog does not call
-		it either (section 4): the window is a deliberate stop, and what the
-		tree has selected is not where the add-on stands.
-		"""
-		loaded = self._checklist
-		if loaded is None:
-			# Unreachable: the key acts on a node of the tree, and a tree with
-			# nodes was built from a checklist.
-			log.error("the window cycled a status with no checklist open")
-			return
-		if not self._write(loaded, lambda: item.record_status(status.cycled(item.status))):
-			return
-		self._announce_completion(loaded)
-
-	def _reset_all(self) -> None:
-		"""Put every item of the checklist back to pending and erase every comment.
-
-		The far side of "Reset all progress" (section 5), and the twin of the
-		`R` key with one difference — how much it takes in. The erasing is the
-		same, the one write per command is the same, and so is the reason the
-		comments go with the statuses (section 3.2.2): a comment that outlived
-		a reset would be spoken over an item nobody has checked.
-
-		**Success says nothing**, and that is where the twins part. `R` leaves
-		the tester in the application under test, where nothing but the add-on
-		would speak; here the window is still standing, and while it stands the
-		add-on says nothing of its own (sections 5 and 5.3). A write that did
-		not reach the disk speaks all the same, as it does from everywhere
-		(section 4), and goes out late: the confirmation has just closed, and
-		NVDA is about to announce the window that took the focus back (section
-		6).
-
-		No end-of-run notice, and none possible: nothing in the checklist
-		carries a verdict any more.
-		"""
-		loaded = self._checklist
-		if loaded is None:
-			# Unreachable: the button is disabled whenever no checklist is open.
-			log.error("the window asked for a reset with no checklist open")
-			return
-		_ = self._write(loaded, loaded.reset, say=modal.message)
+		self._narrate(self._run.save(item, status_value, comment), after_window=True)
 
 	def _choose_checklist(self) -> None:
 		"""Ask the tester which checklist to open (section 3.2.2).
 
 		The browsing starts in the folder of the last path in `state.json`,
-		which is lying there anyway (section 3.2.2), and the file is read off
-		the disk rather than off `self._checklist`: the two agree while one is
-		open, and the moment they do not is exactly the moment this is wanted —
-		start-up found the file gone, so there is no checklist in hand and the
-		only thing left pointing anywhere is that path (section 2).
-
-		What was remembered is read once, here, and carried to `_open` rather
-		than read again on the far side: nothing can have changed it in between,
-		because the add-on is the only writer of that file and its commands are
-		blocked while the dialog is open (section 3.3.1).
+		which is lying there anyway (section 3.2.2), and the run reads it off
+		the disk rather than off the checklist in hand: the two agree while one
+		is open, and the moment they do not is exactly the moment this is
+		wanted — start-up found the file gone, so there is no checklist in hand
+		and the only thing left pointing anywhere is that path (section 2).
 
 		The answer arrives long after this has returned, in `_open`.
 		"""
-		remembered = session.load(self._state)
-		folder = remembered.checklist
-		modal.choose_file(
-			None if folder is None else folder.parent,
-			lambda path: self._open(path, remembered),
-		)
+		modal.choose_file(self._run.remembered(), self._open)
 
-	def _open(self, path: Path, remembered: Session) -> None:
+	def _open(self, path: Path) -> None:
 		"""Open the checklist the tester just picked, or show why it will not open.
 
 		The far side of the file dialog opened by `O` (section 3.2.2). The
-		opening itself is `_load`'s, and what is left here is what belongs to
-		this way in: a refusal goes into a window, and a file that opened is
-		spoken. Both are the difference from the same load at start-up, where
-		section 4 forbids the window and allows only four words — the person
-		who pressed "Open" is waiting for an answer, and one who pressed
-		nothing is not.
+		opening is `Run.open`'s, and it answers a refusal with exactly one
+		event, which is what lets the list be taken apart by shape: one
+		refusal, a window; anything else, the ordinary narration of a landing.
 
-		A refusal that names a file which could not be opened at all should not
-		happen, since the dialog only offers files that exist, but a file can
-		be taken away or locked between the picking and the opening.
+		The window shows the long form, which names the field, the item and
+		the value (section 2): the person who pressed "Open" is waiting for an
+		answer, where a file that loaded without anyone asking gets four words
+		spoken and no window (section 4). A file that could not be opened at
+		all — taken away or locked between the picking and the opening — has
+		no field, item or value to name, and the window shows the same short
+		sentence the voice would have used; which encoding the author had in
+		mind, or what the file system objected to, is not something the add-on
+		can say, and the log is where the second survives.
 
-		`remembered` is what `state.json` said when the dialog was opened, read
-		once by `_choose_checklist` and carried here rather than read again.
+		What opened is spoken late: the file dialog has just handed the focus
+		back, and NVDA is about to announce the window that took it (section
+		6). A file just opened is a jump, so the section is named (section
+		3.2.2), and a checklist with nowhere to stand in says so.
 		"""
-		answer = self._load(path, remembered)
-		if isinstance(answer, str):
-			modal.report(answer)
-			return
-		self._speak_opened(answer)
-
-	def _load(self, path: Path, remembered: Session) -> Checklist | str:
-		"""Open the checklist at `path` and stand in it, or say why it will not open.
-
-		The whole of opening a file, and the one place it happens: the `O` key
-		gets here through `_open` and `Browse...` in the GUI window through
-		`_browse` (sections 3.2.2 and 5). Section 3.2.2 calls those one
-		operation differing only in where the path came from, and this is the
-		operation — down to where the tester lands, which `_adopt` settles the
-		same way for both.
-
-		The answer is the checklist that is now open, or the sentence saying why
-		none is — one or the other, and the caller tells them apart by asking
-		whether it got a string. The sentence is the long form, which names the
-		field, the item and the value (section 2): both callers were asked by
-		the tester and both show a window, so the short spoken form section 4
-		keeps for a file nobody asked for belongs to neither. Both build it from
-		the same `Problem`, which is the one source of the wording the add-on is
-		allowed.
-
-		A file that could not be opened at all has no field, item or value to
-		name, and what is shown is then the same short sentence the voice would
-		have used: which encoding the author had in mind, or what the file
-		system objected to, is not something the add-on can say.
-
-		**A refusal leaves everything as it was** (section 2): `state.json` is
-		not written, and neither the position nor the checklist in hand moves.
-		A file that would not open has not replaced the one that did, and the
-		path in `state.json` is where the file dialog starts browsing — erasing
-		it here would erase it exactly when it is needed.
-		"""
-		try:
-			loaded = checklist.load(path)
-		except OSError:
-			log.error(f"could not read the checklist at {path}", exc_info=True)
-			return wording.shown_refusal()
-		except checklist.ChecklistError as refusal:
-			return wording.shown_refusal(refusal.problem)
-		self._adopt(loaded, remembered.position_in(path))
-		# The path and the position reach the disk now, as after any other
-		# change of position (section 2), and a write that does not get there is
-		# a line in the log; `_remember` holds both halves of that rule.
-		self._remember()
-		return loaded
-
-	def _adopt(self, loaded: Checklist, remembered: Position | None) -> None:
-		"""Make `loaded` the checklist every command works on, standing where it was left.
-
-		The middle of both ways a checklist arrives — the restore at start-up
-		and the file dialog — which section 3.2.2 calls one operation differing
-		only in where the path came from.
-
-		`remembered` is what `state.json` held **for this file**, which is why
-		both callers ask for it by path: that file holds one pair of indices,
-		measured in whichever checklist was open when it was written, so the
-		same file reopened lands where the tester stopped while another starts
-		at its first item (section 3.2.2). What to do with a pair that no longer
-		names a place in the file it does belong to is `navigation.resume`'s,
-		and it answers with the first item as well.
-		"""
-		self._checklist = loaded
-		self._position = navigation.resume(loaded, remembered)
-
-	def _speak_opened(self, loaded: Checklist) -> None:
-		"""Say where the tester has landed in the checklist they just opened.
-
-		Section 3.2.2 speaks the item the way a jump between sections speaks it
-		(section 3.1) — the name of the section, then the text, the status and
-		the note. The name is there for the same reason it is there after a
-		jump, only more so: landing in a file that was not open a moment ago is
-		the most deliberate jump there is, and without the section the tester
-		would not know where they had arrived. The name of the checklist is not
-		spoken — they picked the file themselves, so "which file?" already has
-		an answer, while "where am I?" does not.
-
-		Silence is what a restore at start-up gets and what this may not have
-		(section 2): a command was given here, and a window that closed without
-		a word would sound exactly like one that was cancelled.
-
-		It goes out through `modal.message`, because the file dialog has just
-		handed the focus back and NVDA is about to announce the window that
-		took it — a phrase queued at once would be cut off by it (section 6).
-		"""
-		position = self._position
-		if position is None:
-			# A checklist of empty sections is valid (section 2), and there is
-			# nowhere in it to stand; the same sentence says so as when a command
-			# finds it, rather than a second one saying the same thing.
-			self._say_there_is_no_item(modal.message)
-			return
-		self._speak(loaded, position, name_the_section=True, say=modal.message)
-
-	def _navigate(self, direction: Direction) -> None:
-		"""Move one item, or — on the second press of the series — one section.
-
-		Both presses are the same scan of section 3.4, differing only in where
-		they start and what they step over, so there is one path through here
-		and no branch anywhere on the state of the filter.
-
-		A third press and beyond is left doing what the second did: it scans
-		from the same anchor to the same place and says it again. Section 6 has
-		the add-on go no deeper than two levels and defines no behaviour for a
-		third, and repeating the answer invents none.
-		"""
-		standing = self._standing()
-		if standing is None:
-			return
-		loaded, position = standing
-		jump = scriptHandler.getLastScriptRepeatCount() > 0
-		if not jump:
-			self._anchor = position
-		start, step = (self._anchor, Step.SECTION) if jump else (position, Step.ITEM)
-		found = navigation.scan(loaded, start, direction, step, navigation.unfiltered)
-		if found is None:
-			self._refuse(direction, jump=jump)
-			return
-		self._land(loaded, found, name_the_section=jump)
-
-	def _land(
-		self,
-		loaded: Checklist,
-		found: Position,
-		name_the_section: bool = False,
-		say: Callable[[str], None] = ui.message,
-	) -> None:
-		"""Stand on `found`, put that on disk, and say what is there.
-
-		What every move of the position does, whoever made it: the navigation
-		keys (section 3.1), auto-advance (section 4) and "Move to" in the
-		window (section 5.1) all end here. The order is the rule rather than
-		the convenience — the position reaches `state.json` **before** the item
-		is spoken (sections 2 and 4), which is the same order a change of data
-		is held to and holds for the same reason: the disk has stopped the
-		keyboard either way, and all that is chosen is where inside that pause
-		the voice starts.
-
-		`name_the_section` belongs to a jump and to nothing else (section 3.1):
-		a step to the next item would be paying for a word the tester already
-		knows, on every press. `say` is how the phrase reaches them, as in
-		`_speak` and `_write`: `ui.message` from a command that runs with the
-		focus where it was, and `modal.message` from one that has just closed a
-		window (section 6).
-
-		Opening a checklist does not come through here, and that is not an
-		oversight: it moves the path as well as the position (section 3.2.2).
-		"""
-		self._position = found
-		self._remember()
-		self._speak(loaded, found, name_the_section=name_the_section, say=say)
-
-	def _remember(self) -> None:
-		"""Put the position on disk, now (section 2).
-
-		Every change of the position comes through here, and there is no other
-		moment at which the file is brought up to date — the same rule the
-		checklist is written by, and for the same reason: ten items read
-		through without a single mark would otherwise be ten items lost to a
-		crash, and reading ahead is ordinary work rather than an exception.
-		Whatever opens a checklist of its own (section 3.2.2) changes the path
-		as well as the position, and belongs here too.
-
-		Nothing is written before a checklist has been opened, which is also
-		what makes the position below safe to read: no file, nothing to
-		remember. A tester who has never used the add-on gets no folder in
-		their configuration directory for it.
-
-		A write that does not get there is a line in the log and nothing else
-		(section 2). This runs on every press of a navigation key, so a spoken
-		refusal would arrive on every press too, over the top of the item it
-		was pressed for; and what is lost is the place, not the run.
-		"""
-		if self._checklist is None:
-			return
-		try:
-			session.save(self._state, Session(self._checklist.path, self._position))
-		except OSError:
-			log.error(f"could not write the session state to {self._state}", exc_info=True)
-
-	def _refuse(self, direction: Direction, jump: bool) -> None:
-		"""Say that there is nothing that way.
-
-		Section 3.1 answers a single press with a tone and a jump with words.
-		A tone is what the most frequent of the two can afford; a jump is
-		deliberate, and silence would not say whether it failed or simply
-		landed somewhere whose name went unheard.
-
-		The position is left exactly as it stands, which after a failed jump is
-		wherever the first press of the series already took it (section 3.1).
-		Putting it back would mean undoing a press that had run — the one
-		mechanism section 3.2.1 was glad to be rid of.
-		"""
-		if not jump:
-			signals.list_boundary()
-		elif direction is Direction.FORWARD:
-			# Translators: Spoken when there is no section after this one to jump to.
-			ui.message(_("End of list"))
-		else:
-			# Translators: Spoken when there is no section before this one to jump to.
-			ui.message(_("Start of list"))
-
-	def _speak(
-		self,
-		loaded: Checklist,
-		position: Position,
-		name_the_section: bool = False,
-		say: Callable[[str], None] = ui.message,
-	) -> None:
-		"""Say the item at `position`, the way sections 3.1 and 3.3 both say it.
-
-		`say` is `ui.message` from a command that runs with the focus where the
-		tester left it, and `modal.message` from one that has just closed a
-		window, whose phrase would otherwise be cut off by the focus coming
-		back (section 6) — the same choice `_write` makes, and for the same
-		reason.
-		"""
-		section = navigation.section_at(loaded, position).name if name_the_section else None
-		say(wording.spoken_item(navigation.item_at(loaded, position), section))
-
-	def _speak_progress(self) -> None:
-		"""Say which section the tester is in and how far it has got (section 3.3).
-
-		The `P` key of the command mode. It is asked from nowhere in particular,
-		which is why it names the section out loud where a jump between sections
-		does not (section 3.1), and it counts the **whole** section however the
-		filter is set (section 3.4). Nothing is written and nothing moves: the
-		command answers "where am I?" and leaves everything as it found it.
-		"""
-		standing = self._standing()
-		if standing is None:
-			return
-		loaded, position = standing
-		section = navigation.section_at(loaded, position)
-		ui.message(wording.spoken_progress(section.name, progress.of(section.items)))
+		answer = self._run.open(path)
+		match answer:
+			case [Refused(problem)]:
+				modal.report(wording.shown_refusal(problem))
+			case [Unreadable(error)]:
+				log.error(f"could not read the checklist at {path}", exc_info=error)
+				modal.report(wording.shown_refusal())
+			case [ChecklistGone()]:
+				modal.report(wording.shown_refusal())
+			case _:
+				self._narrate(answer, after_window=True)
 
 	def _copy(self, fragment: str) -> None:
 		"""Put `fragment` in the clipboard, and let NVDA say how that went.
@@ -1227,228 +851,101 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 		"""
 		modal.later(lambda: self._copy(fragment))
 
-	def _record_status(self, rule: Callable[[str], str]) -> None:
-		"""Give the current item the status `rule` makes of the one it holds.
+	def _narrate(self, answer: list[Answer], after_window: bool = False) -> None:
+		"""Say what the run answered, in the order it happened.
 
-		The two ways a status is assigned without opening a window meet here and
-		differ only in `rule`, which is handed the status standing in the file
-		and answers with the one to write. The quick toggle passes the total
-		rule of section 3.2.1, which reads what it is replacing: `passed` goes
-		back to `pending`, and any of the other four becomes `passed`. A digit
-		of the command mode passes the status it stands for and ignores what was
-		there (section 3.2.2). Everything after that is the same rule of section
-		4 applied to both, which is why they are one method rather than two.
+		The one place the events become words, tones and a channel. Every
+		event is met here, and the type check holds the `match` to the whole
+		set: an event added to the run and forgotten here would be silence,
+		which is what a global plugin may least afford.
 
-		Not called `verdict`: that word is taken, and taken narrowly — a verdict
-		is any status but `pending` (`core.status.is_verdict`), and one of the
-		two callers here is the digit that puts an item back to `pending`.
+		`after_window` is whether a window of the add-on has just closed, and
+		it chooses the channel and nothing else (section 6): `modal.message`
+		for a phrase, which would otherwise be cut off by NVDA announcing the
+		window that got the focus back, and `modal.later` for the two things
+		that are not a bare phrase — a tone, and the tone with the phrase of
+		the end of the run. From a command that runs with the focus where the
+		tester left it, `ui.message` is heard at once, and a delay would only
+		put the answer back.
 
-		The write, and what is said when it does not get there, are `_write`'s
-		(section 4); the status word, the end-of-run notice and the move on to
-		the next item follow only once the file holds the verdict they are
-		about, and in that order. Section 4 puts the phrase describing **where
-		the tester stands now** last, because that is the place the next command
-		will be about; a run that ended is news about what has just happened,
-		and belongs with the word for it.
+		**Failures go to the log first**, with the traceback the core could
+		not write: the core answers with the error and keeps out of NVDA's log
+		altogether. A write of the checklist that failed is spoken as well,
+		every time, because the phrase is the whole result of the command
+		(section 4); a write of `state.json` that failed is not, because it
+		runs on every press of a navigation key and would drown the item it
+		was pressed for, and what is lost is the place rather than the run
+		(section 2).
 		"""
-		standing = self._standing()
-		if standing is None:
-			return
-		loaded, position = standing
-		item = navigation.item_at(loaded, position)
-		if not self._write(loaded, lambda: item.record_status(rule(item.status))):
-			return
-		ui.message(wording.status_word(item.status))
-		self._announce_completion(loaded)
-		self._advance(loaded, position, item.status)
+		say: Callable[[str], None] = modal.message if after_window else ui.message
+		for event in answer:
+			match event:
+				case Landed(item, section, jump):
+					# The name of the section belongs to a jump and to nothing
+					# else (section 3.1): a step to the next item would be paying
+					# for a word the tester already knows, on every press.
+					say(wording.spoken_item(item, section.name if jump else None))
+				case Here(item, _):
+					say(wording.spoken_item(item))
+				case Boundary(direction, jump):
+					# Section 3.1 answers a single press with a tone and a jump
+					# with words: a tone is what the most frequent of the two can
+					# afford, while a jump is deliberate, and silence would not
+					# say whether it failed or landed somewhere unheard.
+					if not jump:
+						_hold(signals.list_boundary, after_window)
+					elif direction is Direction.FORWARD:
+						# Translators: Spoken when there is no section after this one to jump to.
+						say(_("End of list"))
+					else:
+						# Translators: Spoken when there is no section before this one to jump to.
+						say(_("Start of list"))
+				case NoChecklist():
+					# Translators: Spoken when a command is used before a checklist has been opened.
+					say(_("No checklist loaded"))
+				case NoItems():
+					# Translators: Spoken when a command is used on a checklist whose sections
+					# are all empty, so there is no item to stand on.
+					say(_("The checklist has no items"))
+				case Recorded(value):
+					say(wording.status_word(value))
+				case Saved(change):
+					say(wording.spoken_save(change))
+				case Finished(counted):
+					self._finish(counted, after_window)
+				case SectionReset():
+					# Translators: Spoken after the current section of the checklist has been reset.
+					say(_("Section reset"))
+				case ChecklistReset():
+					# Answered only to the window, which owes it silence (section
+					# 5): the tree it rebuilds is the proof, and a word over it
+					# would be noise. Nothing here asks the run for one.
+					pass
+				case WriteFailed(error):
+					log.error("could not write the checklist", exc_info=error)
+					say(wording.spoken_write_failure())
+				case PlaceNotSaved(error):
+					log.error("could not write the session state", exc_info=error)
+				case SectionProgress(section, counted):
+					say(wording.spoken_progress(section.name, counted))
+				case Refused(problem):
+					say(wording.spoken_refusal(problem))
+				case Unreadable(error):
+					log.error("could not read the checklist", exc_info=error)
+					say(wording.spoken_refusal())
+				case ChecklistGone():
+					# Translators: Spoken when NVDA starts and the checklist that was open
+					# last time is no longer where it was.
+					say(_("Checklist file not found"))
 
-	def _advance(self, loaded: Checklist, marked: Position, recorded: str) -> None:
-		"""Move on to the next visible item, when a verdict has just been given.
+	def _finish(self, counted: Progress, after_window: bool) -> None:
+		"""Say that the run is over: a tone, and the count (section 4).
 
-		Auto-advance (section 4), and the whole of it is which presses reach
-		here: this is called from `_record_status` and from nowhere else.
-
-		**A verdict moves, a return to `pending` stays.** The rule is *move on
-		after a verdict, stop after a correction*, and `core.status.is_verdict`
-		is the one place the two are told apart. The digit `5` and a space bar
-		pressed on a `passed` item both mean the tester is fixing something and
-		wants to stay on the item to read it again — the "undo" slot would be
-		useless if it moved.
-
-		The same rule has two more cases, and neither of them is here rather
-		than by accident. A save from the item dialog does not reach this method
-		at all (section 3.3.1): the dialog is a deliberate stop on one item, and
-		moving the position behind a closing window would leave the next command
-		describing something else. And a write that failed returns before this
-		(`_record_status`), which is **stop after a refusal**: the tester will
-		press on this item again, and a shifted position would send the repeat
-		to the wrong one.
-
-		`marked` is where the verdict was recorded, which is where the tester
-		still stands: nothing has moved the position between the write and here.
-
-		The scan is the one of section 3.4, forward, one item, through the
-		visibility predicate — the same call a single press of the navigation
-		key makes, because "the next visible item" is one idea and not two. In
-		0.1.0 the predicate is identically true, so this is literally the next
-		item; in 0.2.0 it becomes the next `pending` one and nothing here
-		changes.
-
-		**Nothing at the end of the checklist**: no tone, no message, the
-		position simply stays (section 4). The tester gave no navigation
-		command, so the boundary signal of section 3.1 would be reporting a
-		failure that did not happen. That is the whole difference from a
-		navigation key running off the end, and it is why this does not answer
-		through `_refuse`; landing is the same operation for both, and
-		`_land` is where it is written.
-		"""
-		if not status.is_verdict(recorded) or not preferences.auto_advance():
-			return
-		found = navigation.scan(
-			loaded,
-			marked,
-			Direction.FORWARD,
-			Step.ITEM,
-			navigation.unfiltered,
-		)
-		if found is None:
-			return
-		self._land(loaded, found)
-
-	def _save_item(
-		self,
-		loaded: Checklist,
-		item: Item,
-		status_value: str,
-		comment: str,
-		name_the_change: bool = True,
-	) -> None:
-		"""Write what the item dialog was closed on, and say what moved (section 3.3.1).
-
-		The far side of the second press of `NVDA+Alt+I`, and — with
-		`name_the_change` off — of Enter on the tree of the window (section
-		5.2). The window collected a status and a comment and decided nothing
-		about them; what they amount to is one comparison, made before anything
-		is written because all three answers hang on it — whether to write at
-		all, which words to speak, and whether a status has just closed the last
-		pending item of the run.
-
-		**`name_the_change` is who says what changed, not whether it is heard.**
-		From `NVDA+Alt+I` the add-on names it, because the focus goes back to
-		the application under test and nothing else would. From the tree the GUI
-		window is still standing and NVDA is about to announce the node with its
-		new prefix, so the add-on stays quiet and lets it (section 5). The rest
-		of the method does not move either way: the same comparison, the same
-		one write, the same end-of-run notice.
-
-		**A save that moved neither field is a save that does nothing**: no
-		file, no word, the same silence as Cancel. Writing anyway would buy
-		exactly one thing — the chance to hear *"Error writing the file"* for a
-		command that changed nothing (section 3.3.1).
-
-		The status and the comment go into the document together and reach the
-		disk in one rewrite, which is `Item.record`'s doing; here it matters
-		only that the phrase comes after the write, as section 4 has it for
-		every command that changes data.
-
-		Everything spoken goes out late: the window has just handed the focus
-		back, and NVDA is about to announce the window that took it, so a
-		phrase queued at once would be cut off by it (section 6). The end of a
-		run goes through `modal.later` rather than `modal.message` because it
-		is a tone **and** a phrase, and delaying only the phrase would leave
-		the tone sounding a window announcement ahead of it.
-
-		**No auto-advance** (section 4): the dialog is a deliberate stop on one
-		item, and moving the position quietly behind a closing window would
-		leave the next command describing a different item than the one just
-		edited. The end-of-run notice is the opposite case and is given — but
-		only when the **status** moved, because a comment added to a checklist
-		that had nothing pending before it closed nothing.
-		"""
-		change = checklist.Change.of(item, status_value, comment)
-		if not change.anything:
-			return
-		if not self._write(loaded, lambda: item.record(status_value, comment), say=modal.message):
-			return
-		if name_the_change:
-			modal.message(wording.spoken_save(change))
-		if change.status is not None:
-			modal.later(lambda: self._announce_completion(loaded))
-
-	def _reset_section(self, loaded: Checklist, section: Section) -> None:
-		"""Put every item of `section` back to pending, erase its comments, say so.
-
-		The tester has just answered "Yes" (section 3.2.2), and the focus is on
-		its way back to the application under test — NVDA is about to announce
-		that window, and this phrase has to stand after it rather than under
-		it, which is what `modal.message` is for (section 6). That there is a
-		phrase at all is the rule section 4 holds every change to: a reset that
-		said nothing would sound exactly like a reset that did not happen.
-
-		No end-of-run notice, and none possible: the section held an item to
-		stand on, and every item in it is pending now.
-		"""
-		if not self._write(loaded, section.reset, say=modal.message):
-			return
-		# Translators: Spoken after the current section of the checklist has been reset.
-		modal.message(_("Section reset"))
-
-	def _write(
-		self,
-		loaded: Checklist,
-		change: Callable[[], None],
-		say: Callable[[str], None] = ui.message,
-	) -> bool:
-		"""Make `change`, which rewrites the file, and say so only when it did not get there.
-
-		Every command that changes data comes through here, and section 4
-		holds them all to one order: **the file is written first and the
-		result spoken second**. Reversed, a failure would arrive after the word
-		it contradicts, where the next keypress cancels the speech queue and
-		leaves the tester with "passed" and every reason to believe the result
-		is safe — the silent loss the rest of section 2 is written against.
-		The voice pays nothing for the order: the write was synchronous on
-		every press either way, and all that moves is where inside that window
-		the speech begins.
-
-		So a write that fails **refuses the command**, and False is the
-		caller's cue to add nothing: one phrase, no status word, no next item,
-		no signal that the run is over. No window either — the tester is in the
-		application under test, and section 1 forbids taking the focus out of
-		it. It says so on every press, because a command that changes data and
-		then falls silent is, at the keyboard, an add-on that has crashed; and
-		the change is left standing in memory, because rolling it back is the
-		mechanism section 3.2.1 was glad to be rid of. Any later write carries
-		the whole file, so the first one that succeeds takes everything that
-		has piled up with it.
-
-		`say` is how that phrase reaches the tester: `ui.message` from a
-		command that runs with the focus where it was, and `modal.message` from
-		one that has just closed a window and would otherwise be cut off by
-		the focus coming back (section 6).
-		"""
-		try:
-			change()
-		except OSError:
-			log.error(f"could not write the checklist to {loaded.path}", exc_info=True)
-			say(wording.spoken_write_failure())
-			return False
-		return True
-
-	def _announce_completion(self, loaded: Checklist) -> None:
-		"""Say that the run is over, when this status left nothing pending.
-
-		Section 4, and it belongs to every path that gives an item a status —
-		the quick toggle, a digit of the command mode, the combo box of the
-		item dialog — rather than to any one of them. It is news about the run,
-		so auto-advance has no say in whether it is spoken, and the condition
-		is the measure `core.progress` counts by everywhere: nothing still
-		`pending`, rather than everything passed. A checklist holding one
-		failure is finished work.
-
-		A write that failed never reaches here, and that is the point: the
-		phrase would be claiming something about the run that the disk does not
-		say.
+		It belongs to every path that gives an item a status — the quick
+		toggle, a digit of the command mode, the combo box of the item dialog
+		— rather than to any one of them. It is news about the run, so
+		auto-advance has no say in whether it is spoken, and the condition is
+		the run's: nothing still `pending`, rather than everything passed.
 
 		**The tone will be heard before the verdict it follows**, and that is
 		accepted rather than overlooked. `ui.message` puts the status word in
@@ -1460,60 +957,12 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 		`ui.message`, and `signals` is the only module that touches `tones`, so
 		that the five signals can be picked to differ from one another.
 
-		**The tone is why this takes no `say` of its own**, unlike everything
-		else the add-on speaks. A save from the item dialog cannot delay the
-		phrase and leave the tone where it was — that would part the two by a
-		whole window announcement — so the caller delays the pair instead, with
-		`modal.later`, and what happens inside here is the same either way.
+		After a window the pair waits whole, through `_hold`: delaying only the
+		phrase would part the two by a whole window announcement.
 		"""
-		counted = progress.of(loaded.items)
-		if not counted.finished:
-			return
-		signals.checklist_finished()
-		ui.message(wording.spoken_completion(counted))
 
-	def _standing(self) -> tuple[Checklist, Position] | None:
-		"""The checklist and the place in it a command works on, or None for neither.
+		def announce() -> None:
+			signals.checklist_finished()
+			ui.message(wording.spoken_completion(counted))
 
-		Every command begins by asking this, because every command needs both
-		halves and neither is promised: no checklist has been opened until
-		`state.json` or the file dialog puts one here, and a checklist whose
-		sections are all empty is valid and has nowhere to stand in (section 2).
-
-		None means the reason has **already been spoken** and the caller has
-		nothing left to do but return. Saying it here rather than at each call
-		site is what keeps the two states of section 4 told apart in one place;
-		`_say_there_is_no_item` is where the difference between them is written
-		down.
-		"""
-		loaded = self._checklist
-		position = self._position
-		if loaded is None or position is None:
-			self._say_there_is_no_item()
-			return None
-		return loaded, position
-
-	def _say_there_is_no_item(self, say: Callable[[str], None] = ui.message) -> None:
-		"""Section 4: why a command found nothing to work on, worded in one place.
-
-		Two states reach here and they are not the same one. Nothing has been
-		opened at all — and nothing could be, until `state.json` or the file
-		dialog (section 3.2.2) puts a file here. Or a checklist is open and has
-		no items in it: section 2 asks a file for at least one section and
-		never for a minimum of items, so that file is valid and genuinely
-		loaded, and answering it with "not loaded" would be a lie about the one
-		thing the tester can check at that moment — whether they opened the
-		file they meant to. What to do about them differs too: pick a file, or
-		write some items into the one already picked.
-
-		`say` is how it reaches them, as in `_speak` and `_write`: the second
-		state is also what a checklist just opened by the file dialog can turn
-		out to be, and a window has closed by then.
-		"""
-		if self._checklist is None:
-			# Translators: Spoken when a command is used before a checklist has been opened.
-			say(_("No checklist loaded"))
-			return
-		# Translators: Spoken when a command is used on a checklist whose sections
-		# are all empty, so there is no item to stand on.
-		say(_("The checklist has no items"))
+		_hold(announce, after_window)

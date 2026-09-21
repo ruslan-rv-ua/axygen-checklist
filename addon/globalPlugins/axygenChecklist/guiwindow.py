@@ -59,15 +59,18 @@ Every label changed, so there is nothing in the old tree left worth keeping;
 that is the opposite of a save from the item dialog, which changes one label
 and must not cost the tester the expansion they made by hand.
 
-**The window collects, and it decides nothing.** Where the tester asked to be
-moved to comes back out of `show` as a `Position`; what a save from the item
-dialog amounts to goes straight out to `on_save`; the file picked with
-`Browse...` goes out to `on_browse`, which answers with the checklist that is
-now open or with the reason it is not; and a confirmed reset goes out to
-`on_reset`, which answers nothing, because what the tree shows afterwards is
-the checklist it was showing already. Whether anything changed, what reaches
-the file, what `state.json` gets and what is spoken are settled where every
-other change of data is settled, in the plugin and the core.
+**The window holds the run and asks it.** A save from the item dialog, the
+next status of the cycle, the file picked with `Browse...` and a confirmed
+reset are all commands of the `Run` the plugin handed over, made from here and
+answered with events (`core.run`); what reaches the file and what `state.json`
+gets are the run's to settle, as for every other change of data. What the
+window settles is what it owes those events, and section 5 answers that with
+silence: NVDA announcing the node of the tree is the proof, so the window's
+narrator speaks only of a write that did not reach the disk and of the end of
+the run, and meets everything else with an explicit `case _`. Where the tester
+asked to be moved to is the one thing that still comes back out of `show`, as
+a `Position`, because "Move to" closes the window and what is said about the
+landing has to outlive it.
 
 **The auto-advance checkbox is the one thing in here that writes**, and it is
 not an exception to that but a different kind of thing: the option is NVDA's
@@ -90,14 +93,17 @@ from collections.abc import Callable
 from pathlib import Path
 
 import addonHandler
+import ui
 import wx
 from gui import guiHelper
 from gui.dpiScalingHelper import DpiScalingHelperMixinWithoutInit
 from logHandler import log
 
 from . import itemdialog, layout, modal, preferences, signals, wording
-from .core.checklist import Checklist, Item
+from .core.checklist import Item
 from .core.navigation import Position
+from .core.progress import Progress
+from .core.run import Answer, ChecklistGone, Finished, PlaceNotSaved, Refused, Run, Unreadable, WriteFailed
 
 addonHandler.initTranslation()
 
@@ -113,88 +119,35 @@ _PANEL_HEIGHT = 80
 _window: "_ChecklistWindow | None" = None
 
 
-@dataclasses.dataclass(frozen=True)
-class Standing:
-	"""A checklist and the place in it the tester stands — what the tree is built from.
-
-	What `Browse...` gets back when a file opened (section 5.3), and what the
-	window keeps of whatever it is showing, so that a reset has something to
-	rebuild the tree from. `position` is None for a checklist there is nowhere
-	to stand in, exactly as it is at the door: section 2 asks a file for at
-	least one section and never for a minimum of items.
-
-	Where the tester stands after opening a file is not this window's to decide
-	— section 3.2.2 settles it, the same file landing where it was left and
-	another starting at its first item — so what arrives here is an answer
-	rather than a question.
-	"""
-
-	checklist: Checklist
-	position: Position | None
-
-
-#: What `Browse...` makes of the file the tester picked: where they now stand,
-#: or the reason the file was refused — which field, which item, which value
-#: (sections 2 and 5). One or the other, never both and never neither, which is
-#: what a union says and a record with two optional halves would not.
-Browsed = Standing | str
-
-
-def show(
-	checklist: Checklist | None,
-	position: Position | None,
-	on_move: Callable[[Position], None],
-	on_save: Callable[[Item, str, str], None],
-	on_browse: Callable[[Path], Browsed],
-	on_reset: Callable[[], None],
-	on_cycle: Callable[[Item], None],
-) -> None:
-	"""Open the window on `checklist`, standing on `position` (section 5).
+def show(run: Run, on_move: Callable[[Position], None]) -> None:
+	"""Open the window on `run` (section 5).
 
 	Both ways in come here — the Tools menu and the `G` key — and there is no
 	third case to answer any more: while the window stands, both of them are
 	blocked, so a second press cannot arrive and no window has to be found and
 	raised rather than built.
 
-	`checklist` is None when none has been opened yet, and the window opens all
-	the same. Section 5 puts the choosing of a file **inside** this window, so
-	asking for one at the door would put the way in behind having come in
-	already — the rule `O` and `A` follow as well (sections 3.2.2 and 4). The
-	tree is then empty.
-
-	`position` is where the tester stands, and the node it names opens selected.
-	None when there is nowhere to stand — no checklist, or one whose sections are
-	all empty (section 2) — and the first node is selected instead.
+	`run` is the one run of the plugin, and the window asks it for everything:
+	the checklist the tree is built from, which may be None when none has been
+	opened yet — the window opens all the same, on an empty tree, because
+	section 5 puts the choosing of a file **inside** it, and asking for one at
+	the door would put the way in behind having come in already, the rule `O`
+	and `A` follow as well (sections 3.2.2 and 4); the position, whose node
+	opens selected, or the first node when there is nowhere to stand (section
+	2); and every change made from here — a save, the next status, a file
+	picked, a reset — which the run answers with events for `_narrate`.
 
 	`on_move` is called with the position the tester asked to be moved to, and
 	only for "Move to": the window has closed by then, so what is said about
-	the landing has to outlive that (sections 5.1 and 6). `on_save` is called
-	for a save from the item dialog, while the window still stands, and is
-	handed the item and the pair the dialog collected (section 5.2).
-
-	`on_browse` is called with the file the tester picked with `Browse...`, and
-	answers with what became of it — the checklist that is now open, or the
-	sentence saying why it is not (section 5.3). Opening a file is a change of
-	data like any other and is settled where they all are; what comes back is
-	what the window has left to do about it, which is to show it.
-
-	`on_reset` is called once the tester has answered Yes to "Reset all
-	progress", and not before: the question is the window's to ask and the
-	erasing is not. It answers nothing — the checklist it just emptied is the
-	one the tree is built from either way — and says nothing either, unless the
-	write failed (sections 4 and 5.3).
-
-	`on_cycle` is called with the item "Next status" was pressed on, and gives
-	it the next status of the cycle (section 5.1). It says nothing of the
-	status: the label written afterwards changes under the focus, so NVDA
-	rereads the node with its new prefix, and that is the proof.
+	the landing has to outlive that (sections 5.1 and 6). It is the one thing
+	that comes back out rather than being asked of the run from here.
 	"""
 
 	def build_and_hold(parent: wx.Window) -> "_ChecklistWindow":
 		# Named for the second half: the window is also put where `close` can
 		# reach it, which is the whole reason this module keeps a name at all.
 		global _window
-		_window = _ChecklistWindow(parent, checklist, position, on_save, on_browse, on_reset, on_cycle)
+		_window = _ChecklistWindow(parent, run)
 		return _window
 
 	def answered(dialog: "_ChecklistWindow", answer: int) -> None:
@@ -312,16 +265,7 @@ class _ChecklistWindow(DpiScalingHelperMixinWithoutInit, wx.Dialog):
 	section 5 promises to show.
 	"""
 
-	def __init__(
-		self,
-		parent: wx.Window,
-		checklist: Checklist | None,
-		position: Position | None,
-		on_save: Callable[[Item, str, str], None],
-		on_browse: Callable[[Path], Browsed],
-		on_reset: Callable[[], None],
-		on_cycle: Callable[[Item], None],
-	) -> None:
+	def __init__(self, parent: wx.Window, run: Run) -> None:
 		super().__init__(
 			parent,
 			# Translators: The title of the add-on's own window, which shows the whole
@@ -329,24 +273,15 @@ class _ChecklistWindow(DpiScalingHelperMixinWithoutInit, wx.Dialog):
 			title=_("Axygen Checklist"),
 			style=wx.DEFAULT_DIALOG_STYLE | wx.RESIZE_BORDER | wx.MAXIMIZE_BOX,
 		)
-		self._on_save = on_save
-		#: What the plugin makes of a file picked with `Browse...`. Named for
-		#: what it does rather than after the button, because `_on_browse` — the
-		#: handler the button is bound to — has that name already.
-		self._open_file = on_browse
-		#: What the plugin does once a reset has been agreed to. Named as the
-		#: work rather than as the button, for the reason `_open_file` is.
-		self._erase_progress = on_reset
-		self._on_cycle = on_cycle
+		#: The run the window is an excursion into: the checklist the tree is
+		#: built from and the place the tester stands, read off it wherever the
+		#: tree is filled, and every change made from here is a command of it.
+		#: Nothing of either is kept a second time in the window — the run is
+		#: where they can change, and the window asks.
+		self._run = run
 		#: Where "Move to" was asked to go, and None until it is asked; see
 		#: `chosen_position`.
 		self._chosen: Position | None = None
-		#: The checklist on show and the place the tester stands in it, and None
-		#: when no checklist is open. Set wherever the tree is filled, which is
-		#: the only place either can change while the window stands, and read by
-		#: the reset, which has to build the same tree again from the far side
-		#: of a document every label of which has moved.
-		self._showing: Standing | None = None
 		#: True while the window builds the tree itself, and that is the whole of
 		#: what tells the window's own work apart from a step the tester took
 		#: through the tree — the comment signal sounds for the second and not
@@ -518,7 +453,7 @@ class _ChecklistWindow(DpiScalingHelperMixinWithoutInit, wx.Dialog):
 		# window used to be did (sections 5 and 6) — and with Ctrl+Enter now a
 		# key of the tree, the window has no accelerator table at all.
 		self.SetEscapeId(wx.ID_CANCEL)
-		self._fill(checklist, position)
+		self._fill()
 		# Where the window opens (section 5): on the tree, which is the window.
 		# The row above it is first in the Tab walk and last to want the focus,
 		# and so is the tab strip now in front of both — the tab is switched
@@ -652,8 +587,8 @@ class _ChecklistWindow(DpiScalingHelperMixinWithoutInit, wx.Dialog):
 		"""
 		return self._chosen
 
-	def _fill(self, checklist: Checklist | None, position: Position | None) -> None:
-		"""Build the tree out of `checklist`, standing on `position`.
+	def _fill(self) -> None:
+		"""Build the tree out of the run's checklist, standing where the run stands.
 
 		Every section is expanded, because section 5 promises the **whole**
 		structure and a collapsed section hides the thing the window was opened
@@ -667,14 +602,15 @@ class _ChecklistWindow(DpiScalingHelperMixinWithoutInit, wx.Dialog):
 		every label of it changed. A file that was refused reaches none of
 		them, so nothing in the window claims it (section 5.3).
 
-		**What is on show is written down here as well**, for the same reason
-		and in the same breath: this is the one place it can change while the
-		window stands, so a second place to keep it would be a second thing to
-		keep true. "Reset all progress" is what reads it, and it is what says
-		whether that button can be pressed at all — with no checklist open
-		there is nothing to erase, and an irreversible question about nothing
-		would cost more than a button that cannot be pressed (section 5).
+		**"Reset all progress" is enabled here as well**, for the same reason
+		and in the same breath: whether a checklist is open can change only
+		where the tree is filled, and that is what says whether the button can
+		be pressed at all — with no checklist open there is nothing to erase,
+		and an irreversible question about nothing would cost more than a
+		button that cannot be pressed (section 5).
 		"""
+		checklist = self._run.checklist
+		position = self._run.position
 		# Filling the tree moves the selection twice over — `DeleteAllItems` takes
 		# it off the node it was on and `_select` puts it on the new one — and wx
 		# raises the selection event for both, inside these calls. The flag covers
@@ -686,8 +622,7 @@ class _ChecklistWindow(DpiScalingHelperMixinWithoutInit, wx.Dialog):
 		# window's life — and silence is what the signal exists to be told from.
 		self._filling = True
 		try:
-			self._showing = None if checklist is None else Standing(checklist, position)
-			self._reset_all.Enable(self._showing is not None)
+			self._reset_all.Enable(checklist is not None)
 			self._path.SetValue(
 				"" if checklist is None or checklist.path is None else str(checklist.path),
 			)
@@ -859,14 +794,19 @@ class _ChecklistWindow(DpiScalingHelperMixinWithoutInit, wx.Dialog):
 		click the tree synthesises for Shift+Enter.
 
 		The window decides nothing about the status itself. Which one comes
-		next, what reaches the disk and what is spoken all belong to the plugin,
-		as they do for every other change of data the window asks for; what is
-		left here is the label, which is the window's own (section 5.2).
+		next and what reaches the disk belong to the run, as they do for every
+		other change of data the window asks for; what is left here is the
+		label, which is the window's own (section 5.2), and the silence the
+		status is owed.
 
 		The label is also what speaks. It changes under the focus, so NVDA
 		takes it for a change of name on the focused node and reads the node
-		again — which is why neither this nor the plugin says a word of its own
-		(section 5.1).
+		again — which is why the `Recorded` the run answers with is met by
+		nothing here (section 5.1). What is left is what section 4 will not
+		let go: a write that did not reach the disk speaks, every time, and
+		the end of a run speaks because it is news about the run rather than
+		about the window. Neither is late: no window has closed, and the
+		focus is on the tree.
 		"""
 		# The node and what it stands for come from the one lookup, so that the
 		# label written below is the label of the item that was just changed.
@@ -879,7 +819,7 @@ class _ChecklistWindow(DpiScalingHelperMixinWithoutInit, wx.Dialog):
 			log.error("the window was asked for the next status of a node holding no item")
 			return
 		item = selected.item
-		self._on_cycle(item)
+		self._narrate(self._run.cycle(item))
 		# Read off the item rather than off what was written, so that a write
 		# that did not reach the disk still shows what is in memory — the rule
 		# section 4 accepts by name, and the same one a save from the dialog
@@ -920,18 +860,34 @@ class _ChecklistWindow(DpiScalingHelperMixinWithoutInit, wx.Dialog):
 		Section 5.3, and both halves of it. A file that opened rebuilds the
 		tree **whole** — the selection and the expansion are nothing to keep
 		here, because the tree is showing another file — and says nothing:
-		while the window stands the add-on speaks only of failures (section 5).
+		while the window stands the add-on speaks only of failures (section 5),
+		so the landing the run answers with is met by silence and the tree.
 		A file that did not open leaves the window exactly as it was and shows
 		the concrete reason, which field, which item, which value (section 2).
 
-		Which of the two it is, the plugin has already decided; the window is
-		told, and shows it.
+		Which of the two it is, the run has already decided, and it answers a
+		refusal with exactly one event: that is what lets the list be taken
+		apart by shape. A file that could not be read at all has no field,
+		item or value to name, and the window shows the same short sentence
+		the voice would have used; the log is where the file system's reason
+		survives. The error hangs off this window rather than off
+		`gui.mainFrame` (section 6).
 		"""
-		answer = self._open_file(path)
-		if isinstance(answer, str):
-			modal.report(answer, parent=self)
-			return
-		self._fill(answer.checklist, answer.position)
+		answer = self._run.open(path)
+		match answer:
+			case [Refused(problem)]:
+				modal.report(wording.shown_refusal(problem), parent=self)
+				return
+			case [Unreadable(error)]:
+				log.error(f"could not read the checklist at {path}", exc_info=error)
+				modal.report(wording.shown_refusal(), parent=self)
+				return
+			case [ChecklistGone()]:
+				modal.report(wording.shown_refusal(), parent=self)
+				return
+			case _:
+				self._narrate(answer, after_window=True)
+		self._fill()
 
 	def _on_auto_advance(self, event: wx.CommandEvent) -> None:
 		"""Auto-advance was turned on or off: write it, now (sections 4 and 5).
@@ -1008,13 +964,16 @@ class _ChecklistWindow(DpiScalingHelperMixinWithoutInit, wx.Dialog):
 		)
 
 	def _saved(self, node: wx.TreeItemId, item: Item, status_value: str, comment: str) -> None:
-		"""The item dialog was saved: let the plugin write, then show the result.
+		"""The item dialog was saved: let the run write, then show the result.
 
 		**The label is set before NVDA can speak.** This runs the moment the
 		modal loop of the item dialog ends, which is before the event loop gets
 		to the focus coming back to the tree — so the node NVDA announces is
 		already the new one. That is the proof the save happened, and the whole
-		reason this window says nothing of its own about it (section 5.2).
+		reason this window says nothing of its own about it (section 5.2): the
+		`Saved` the run answers with is met by silence, and only a write that
+		did not reach the disk and the end of the run are spoken — late, since
+		the dialog has just handed the focus back (section 6).
 
 		The label is read off the item rather than off what was saved, and that
 		is right even when the write failed: section 4 leaves a failed change
@@ -1023,7 +982,7 @@ class _ChecklistWindow(DpiScalingHelperMixinWithoutInit, wx.Dialog):
 		The tree is **not** rebuilt. A rebuild would lose the selection and the
 		expansion the tester made with their own hands, to change one label.
 		"""
-		self._on_save(item, status_value, comment)
+		self._narrate(self._run.save(item, status_value, comment), after_window=True)
 		self._tree.SetItemText(node, wording.tree_label(item))
 		self._follow_selection()
 
@@ -1060,15 +1019,13 @@ class _ChecklistWindow(DpiScalingHelperMixinWithoutInit, wx.Dialog):
 		`gui.mainFrame`, because the foreground already belongs to us (section
 		6), and `modal.confirm` holds the rest.
 
-		What is on show is read **now** and handed to the far side, rather than
-		read again once the answer comes back. Nothing can change it in
-		between — every command of the add-on is blocked behind this window,
-		and the window itself is blocked behind the question — so the two reads
-		would agree; one read is simply one fewer state to be sure of, and it
-		leaves the far side with nothing to check.
+		The run is asked whether there is a checklist to reset **now**, and not
+		again once the answer comes back: nothing can change it in between —
+		every command of the add-on is blocked behind this window, and the
+		window itself is blocked behind the question — so the run's own answer
+		to a reset with nothing open is left for the type check and never met.
 		"""
-		showing = self._showing
-		if showing is None:
+		if self._run.checklist is None:
 			# Unreachable through the window: the button is disabled whenever
 			# no checklist is open.
 			log.error("a reset was asked for with no checklist open")
@@ -1079,12 +1036,12 @@ class _ChecklistWindow(DpiScalingHelperMixinWithoutInit, wx.Dialog):
 				# every item of it put back to not checked and every comment erased.
 				"Reset all progress? Every status and comment will be erased. This cannot be undone.",
 			),
-			on_yes=lambda: self._confirmed(showing),
+			on_yes=self._confirmed,
 			parent=self,
 		)
 
-	def _confirmed(self, showing: Standing) -> None:
-		"""The tester said Yes: let the plugin erase the run, then show what is left.
+	def _confirmed(self) -> None:
+		"""The tester said Yes: let the run erase itself, then show what is left.
 
 		The tree is rebuilt **whole** (section 5.3), which is the one case
 		where a rebuild costs nothing: every label in it changed, so the
@@ -1094,15 +1051,72 @@ class _ChecklistWindow(DpiScalingHelperMixinWithoutInit, wx.Dialog):
 		the panel and the path field follow the tree, as they do from any other
 		filling of it.
 
-		**Nothing is said**, here or from the plugin, unless the write failed:
-		while the window stands the add-on speaks only of failures (section
-		5.3). The accepted consequence is named in section 5: a reset made
-		while standing on an item that was already pending leaves no proof at
-		all, and the silence is what says it worked.
+		**Nothing is said** unless the write failed: while the window stands
+		the add-on speaks only of failures (section 5.3), so the `ChecklistReset`
+		the run answers with is met by silence, and the one phrase of a failed
+		write goes out late — the confirmation has just closed, and NVDA is
+		about to announce the window that took the focus back (section 6). The
+		accepted consequence is named in section 5: a reset made while
+		standing on an item that was already pending leaves no proof at all,
+		and the silence is what says it worked.
 
 		The tree is rebuilt whether or not the write got through. Section 4
 		leaves a failed change standing in memory, and the tree shows what is
 		in memory — the same rule the label of a saved item follows.
 		"""
-		self._erase_progress()
-		self._fill(showing.checklist, showing.position)
+		self._narrate(self._run.reset(), after_window=True)
+		self._fill()
+
+	def _narrate(self, answer: list[Answer], after_window: bool = False) -> None:
+		"""Say what the window owes the events of `answer`, which is almost nothing.
+
+		The rule of silence of section 5 as an explicit filter: while the
+		window stands, NVDA announcing the node of the tree is the proof that
+		something happened, and a second word over it is noise. So a landing,
+		a status, a save and a reset are met by `case _` and the tree; what is
+		spoken is what section 4 will not let go — a write that did not reach
+		the disk, every time, and the end of the run, because it is news about
+		the run rather than about the window. Both go to the log first when
+		there is a traceback to keep, as does a position that did not reach
+		`state.json`, which section 2 keeps out of the voice altogether.
+
+		`after_window` is whether a window opened from this one has just
+		closed — the item dialog, the confirmation, the file dialog (section
+		6). Then the phrase goes through `modal.message`, or NVDA announcing
+		this window getting the focus back would cut it off, and the end of
+		the run waits whole through `modal.later`, or its tone would sound a
+		window announcement ahead of its words. The next status of the cycle
+		closes no window, and its two phrases are heard at once.
+		"""
+		for event in answer:
+			match event:
+				case WriteFailed(error):
+					log.error("could not write the checklist", exc_info=error)
+					(modal.message if after_window else ui.message)(wording.spoken_write_failure())
+				case Finished(counted):
+					_finish(counted, after_window)
+				case PlaceNotSaved(error):
+					log.error("could not write the session state", exc_info=error)
+				case _:
+					pass
+
+
+def _finish(counted: Progress, after_window: bool) -> None:
+	"""Say that the run is over: a tone, and the count (section 4).
+
+	Spoken from the window for the same reason the plugin speaks it — it is
+	news about the run, whichever way the last verdict was recorded — and in
+	the same shape: the tone sounds straight away and the words queue behind
+	it, which is accepted (section 6). After a window the pair waits whole,
+	because delaying only the phrase would part the two by a whole window
+	announcement.
+	"""
+
+	def announce() -> None:
+		signals.checklist_finished()
+		ui.message(wording.spoken_completion(counted))
+
+	if after_window:
+		modal.later(announce)
+	else:
+		announce()
