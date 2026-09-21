@@ -7,7 +7,7 @@ msgstr ""
 "Project-Id-Version: 'axygenChecklist' '0.0.0'\n"
 "Report-Msgid-Bugs-To: 'https://github.com/ruslan-rv-ua/axygen-checklist/"
 "issues'\n"
-"POT-Creation-Date: 2026-09-19 20:33+0300\n"
+"POT-Creation-Date: 2026-09-21 12:35+0300\n"
 "PO-Revision-Date: 2026-09-16 20:04+0300\n"
 "Last-Translator: Ruslan Iskov <ruslan.rv.ua@gmail.com>\n"
 "Language-Team: Ukrainian\n"
@@ -68,28 +68,16 @@ msgstr "Прогін"
 msgid "Settings"
 msgstr "Налаштування"
 
+#. Translators: The label of the button of the add-on's window that puts every item
+#. of the checklist back to not checked and erases every comment. The letter after
+#. the ampersand is the mnemonic that activates it.
+msgid "&Reset all progress"
+msgstr "&Скинути весь прогрес"
+
 #. Translators: The label of the tree of the add-on's window, which holds every
 #. section of the checklist and every item in them.
 msgid "Checklist"
 msgstr "Чекліст"
-
-#. Translators: The label of the read-only panel under the tree of the add-on's
-#. window, which shows the comment left on the selected checklist item.
-#. Translators: The label of the editable field of the item dialog, where the tester
-#. writes their conclusion about the checklist item.
-msgid "Comment"
-msgstr "Коментар"
-
-#. Translators: The label of the checkbox of the add-on's window that turns on and
-#. off moving to the next checklist item once this one has a verdict. The same
-#. option is on the A key of the command mode.
-msgid "Automatically move to the next item after marking one"
-msgstr "Автоматично переходити до наступного пункту після відмітки"
-
-#. Translators: The label of the control of the add-on's settings that chooses which
-#. field of the item dialog has the focus when that dialog opens.
-msgid "Field focused when an item is opened"
-msgstr "Поле у фокусі при відкритті пункту"
 
 #. Translators: The label of the button of the add-on's window that opens the
 #. selected checklist item in the item dialog. The letter after the ampersand is
@@ -110,17 +98,32 @@ msgstr "&Перейти до"
 msgid "&Next status"
 msgstr "&Наступний статус"
 
-#. Translators: The label of the button of the add-on's window that puts every item
-#. of the checklist back to not checked and erases every comment. The letter after
-#. the ampersand is the mnemonic that activates it.
-msgid "&Reset all progress"
-msgstr "&Скинути весь прогрес"
+#. Translators: The label of the read-only panel under the tree of the add-on's
+#. window, which shows the comment left on the selected checklist item.
+#. Translators: The label of the editable field of the item dialog, where the tester
+#. writes their conclusion about the checklist item.
+#. Translators: One of the fields the item dialog can open on, named in the add-on's
+#. settings. It is the label of the field the comment is written in, and has to read
+#. exactly as that label does.
+msgid "Comment"
+msgstr "Коментар"
 
 #. Translators: The label of the button of the add-on's window that closes it.
 #. Escape does the same. The letter after the ampersand is the mnemonic that
 #. activates it.
 msgid "&Close"
 msgstr "&Закрити"
+
+#. Translators: The label of the checkbox of the add-on's window that turns on and
+#. off moving to the next checklist item once this one has a verdict. The same
+#. option is on the A key of the command mode.
+msgid "Automatically move to the next item after marking one"
+msgstr "Автоматично переходити до наступного пункту після відмітки"
+
+#. Translators: The label of the control of the add-on's settings that chooses which
+#. field of the item dialog has the focus when that dialog opens.
+msgid "Field focused when an item is opened"
+msgstr "Поле у фокусі при відкритті пункту"
 
 #. Translators: The label of the field of the add-on's window that holds the path
 #. of the checklist which is open. The button beside it picks another file.
@@ -149,6 +152,9 @@ msgstr "Пункт чекліста"
 
 #. Translators: The label of the read-only field of the item dialog holding the
 #. whole text of the checklist item.
+#. Translators: One of the fields the item dialog can open on, named in the add-on's
+#. settings. It is the label of the read-only field holding the item text, and has to
+#. read exactly as that label does.
 msgid "Item"
 msgstr "Пункт"
 
@@ -160,6 +166,9 @@ msgstr "Нотатка"
 
 #. Translators: The label of the combo box of the item dialog, where the status of
 #. the checklist item is chosen.
+#. Translators: One of the fields the item dialog can open on, named in the add-on's
+#. settings. It is the label of the combo box holding the status, and has to read
+#. exactly as that label does.
 msgid "Status"
 msgstr "Статус"
 

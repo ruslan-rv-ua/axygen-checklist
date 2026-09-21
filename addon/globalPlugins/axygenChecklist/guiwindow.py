@@ -384,8 +384,8 @@ class _ChecklistWindow(DpiScalingHelperMixinWithoutInit, wx.Dialog):
 		# dialog, and the order it is created in is still the Tab order the
 		# tester walks — within the page, which is where the rule of section 6
 		# about a label naming the control after it is measured.
-		contents = guiHelper.BoxSizerHelper(run_page, orientation=wx.VERTICAL)
-		contents.addItem(self._build_browse_row(run_page), flag=wx.EXPAND)
+		run_contents = guiHelper.BoxSizerHelper(run_page, orientation=wx.VERTICAL)
+		run_contents.addItem(self._build_browse_row(run_page), flag=wx.EXPAND)
 		self._reset_all = wx.Button(
 			run_page,
 			# Translators: The label of the button of the add-on's window that puts every item
@@ -400,7 +400,7 @@ class _ChecklistWindow(DpiScalingHelperMixinWithoutInit, wx.Dialog):
 		# not inside it: the label "Checklist file" has to keep standing
 		# immediately before its own field, which is what both the description
 		# NVDA reads and the name of the field itself hang on (section 6).
-		contents.addItem(self._reset_all)
+		run_contents.addItem(self._reset_all)
 		tree = guiHelper.LabeledControlHelper(
 			run_page,
 			# Translators: The label of the tree of the add-on's window, which holds every
@@ -464,7 +464,7 @@ class _ChecklistWindow(DpiScalingHelperMixinWithoutInit, wx.Dialog):
 		)
 		# The row is what takes the height the window is dragged out to, and
 		# the tree is the only thing in it that grows (section 6).
-		contents.addItem(tree_row, flag=wx.EXPAND, proportion=1)
+		run_contents.addItem(tree_row, flag=wx.EXPAND, proportion=1)
 		comment_panel, self._comment = layout.label_above(
 			run_page,
 			# Translators: The label of the read-only panel under the tree of the add-on's
@@ -479,14 +479,14 @@ class _ChecklistWindow(DpiScalingHelperMixinWithoutInit, wx.Dialog):
 		# stands above the panel for the reason it stands above the tree, which
 		# is `layout`'s to say — and until now these two neighbours wore theirs
 		# two different ways.
-		contents.addItem(comment_panel, flag=wx.EXPAND)
-		self._lay_out_page(run_page, contents)
+		run_contents.addItem(comment_panel, flag=wx.EXPAND)
+		layout.inside_page(run_page, run_contents)
 		self._build_settings_page(settings_page)
 		# The footer belongs to the dialog and not to either page: "Close"
 		# dismisses the **window**, so a copy of it riding on a page would go
 		# missing from the other one.
-		footer = guiHelper.BoxSizerHelper(self, orientation=wx.VERTICAL)
-		footer.addItem(notebook, flag=wx.EXPAND, proportion=1)
+		contents = guiHelper.BoxSizerHelper(self, orientation=wx.VERTICAL)
+		contents.addItem(notebook, flag=wx.EXPAND, proportion=1)
 		close = wx.Button(
 			self,
 			id=wx.ID_CANCEL,
@@ -502,9 +502,9 @@ class _ChecklistWindow(DpiScalingHelperMixinWithoutInit, wx.Dialog):
 		# pushed **left** — the only such row among the windows a tester sees
 		# side by side. Now that "Close" stands alone, the call gives the
 		# footer every NVDA window has: pushed right, ruled off from the rest.
-		footer.addDialogDismissButtons(close, separated=True)
+		contents.addDialogDismissButtons(close, separated=True)
 		main = wx.BoxSizer(wx.VERTICAL)
-		main.Add(footer.sizer, border=guiHelper.BORDER_FOR_DIALOGS, flag=wx.ALL | wx.EXPAND, proportion=1)
+		main.Add(contents.sizer, border=guiHelper.BORDER_FOR_DIALOGS, flag=wx.ALL | wx.EXPAND, proportion=1)
 		main.Fit(self)
 		self.SetSizer(main)
 		# The size `Fit` just settled is the floor (section 6): a window that
@@ -525,19 +525,6 @@ class _ChecklistWindow(DpiScalingHelperMixinWithoutInit, wx.Dialog):
 		# rarely, and the tree is what the window is opened for.
 		self._tree.SetFocus()
 		self.CentreOnScreen()
-
-	def _lay_out_page(self, page: wx.Panel, contents: guiHelper.BoxSizerHelper) -> None:
-		"""Give `page` the sizer `contents` built, inside the usual dialog border.
-
-		The border is the one every window of the add-on stands in
-		(`guiHelper.BORDER_FOR_DIALOGS`), and it is applied per page rather than
-		once around the notebook: a page is the thing a control is drawn in, and
-		a single border outside the tabs would leave every control flush against
-		the edge of its own page.
-		"""
-		sizer = wx.BoxSizer(wx.VERTICAL)
-		sizer.Add(contents.sizer, border=guiHelper.BORDER_FOR_DIALOGS, flag=wx.ALL | wx.EXPAND, proportion=1)
-		page.SetSizer(sizer)
 
 	def _build_settings_page(self, page: wx.Panel) -> None:
 		"""The *"Settings"* tab: what the tester prefers, and nothing else (section 5).
@@ -584,7 +571,7 @@ class _ChecklistWindow(DpiScalingHelperMixinWithoutInit, wx.Dialog):
 		)
 		self._initial_focus.SetSelection(preferences.FOCUS_TARGETS.index(preferences.initial_focus()))
 		self._initial_focus.Bind(wx.EVT_CHOICE, self._on_initial_focus)
-		self._lay_out_page(page, contents)
+		layout.inside_page(page, contents)
 
 	def _build_browse_row(self, parent: wx.Window) -> wx.Sizer:
 		"""The first row of the window: the file that is open, and the way to another.

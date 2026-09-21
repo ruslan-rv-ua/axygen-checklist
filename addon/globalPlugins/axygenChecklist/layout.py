@@ -3,7 +3,7 @@
 # This file is covered by the GNU General Public License version 2 or later.
 # See the file COPYING.txt for more details.
 
-"""The two pieces of layout `guiHelper` does not do, and why they are done here.
+"""The pieces of layout `guiHelper` does not do, and why they are done here.
 
 Both are cases where the helper does most of the work and stops one step short,
 and both are built out of its own constants, so that a hand-made pair and a
@@ -71,6 +71,24 @@ def label_above[ControlT: wx.Control](
 	sizer.AddSpacer(guiHelper.SPACE_BETWEEN_ASSOCIATED_CONTROL_VERTICAL)
 	sizer.Add(control, flag=wx.EXPAND, proportion=1)
 	return sizer, control
+
+
+def inside_page(page: wx.Panel, contents: guiHelper.BoxSizerHelper) -> None:
+	"""Give `page` what `contents` built, inside the border every window stands in.
+
+	The third thing `guiHelper` stops one step short of. It has the border
+	(`BORDER_FOR_DIALOGS`) and it has the sizer helper, but nothing that puts a
+	notebook page in the one wearing the other — its own dialogs have no pages.
+
+	**The border goes on each page rather than once around the notebook**, and
+	that is the whole reason this is not simply the line the dialog already uses
+	around its own contents: a page is what a control is actually drawn in, so a
+	single border outside the tab strip would leave every control flush against
+	the edge of its own page.
+	"""
+	sizer = wx.BoxSizer(wx.VERTICAL)
+	sizer.Add(contents.sizer, border=guiHelper.BORDER_FOR_DIALOGS, flag=wx.ALL | wx.EXPAND, proportion=1)
+	page.SetSizer(sizer)
 
 
 def button_column(buttons: Sequence[wx.Button]) -> wx.Sizer:

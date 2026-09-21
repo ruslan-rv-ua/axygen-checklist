@@ -57,6 +57,7 @@ changes (section 2) — there the run would be lost, here one press of `A`.
 from typing import TYPE_CHECKING, cast
 
 import config
+from configobj.validate import VdtValueError
 
 if TYPE_CHECKING:
 	# Only the type check ever needs the name, and NVDA carries a note of its
@@ -90,11 +91,10 @@ FOCUS_TARGETS = (FOCUS_ITEM, FOCUS_STATUS, FOCUS_COMMENT)
 
 config.conf.spec[SECTION] = {
 	AUTO_ADVANCE: "boolean(default=True)",
-	# `option` rather than `string`, so that configobj's own validator refuses
-	# anything outside the three and hands back the default instead. The add-on
-	# then never has to ask whether what it read is a field it has: the same
-	# guard `wx.CB_READONLY` gives the status combo box of section 3.3.1, one
-	# layer down and for free.
+	# `option` rather than `string`, so that the set of legal values is declared
+	# where NVDA keeps every other such declaration rather than only enforced by
+	# the control that offers them. What it does **not** do is repair a bad one
+	# — see `initial_focus`.
 	INITIAL_FOCUS: "option({}, default={})".format(
 		", ".join(f'"{target}"' for target in FOCUS_TARGETS),
 		f'"{FOCUS_COMMENT}"',
@@ -131,11 +131,32 @@ def initial_focus() -> str:
 	`auto_advance` is asked when a status is recorded: the value is NVDA's, and
 	a profile switch changes it without anything here being told.
 
-	The answer is always one of the three. `option()` in the spec above makes
-	that configobj's job, so the caller may map the three to three fields and
-	need no fourth branch for a value it has never heard of.
+	**The answer is always one of the three, and that is this function's doing
+	rather than the validator's.** `option()` in the spec above declares the set
+	but does not repair a value outside it: `Validator.check` hands back the
+	default only for a key that is *missing*, and raises `VdtValueError` for one
+	that is present and wrong. NVDA's `AggregatedSection._cacheLeaf` calls it
+	without `missing=True`, and NVDA validated `config.conf` long before this
+	module registered its spec — so nothing between the file and here ever looks
+	at the value, and a hand-edited `initialFocus = note` would come out of the
+	read as an exception.
+
+	Left to travel, that exception would be raised while the settings tab is
+	being built, and the whole window would fail to open — in a global plugin,
+	the class of failure section 2 refuses to risk anywhere else. So the fall
+	back to the default happens here, once, rather than at each of the two
+	callers; both may then map the three to three fields and need no branch for
+	a value they have never heard of.
 	"""
-	return str(_section()[INITIAL_FOCUS])
+	try:
+		stored = _section()[INITIAL_FOCUS]
+	except VdtValueError:
+		# Present and outside the set — the hand-edit above.
+		return FOCUS_COMMENT
+	# And present, in range for the validator, yet still not one of ours: the
+	# only way in is a spec this add-on stopped declaring, which is what a value
+	# dropped in a later version would look like to the version before it.
+	return stored if stored in FOCUS_TARGETS else FOCUS_COMMENT
 
 
 def set_initial_focus(target: str) -> None:
