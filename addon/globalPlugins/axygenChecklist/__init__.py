@@ -856,12 +856,18 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 		the disk, the dictionary supplies the word, `_announce_completion`
 		answers for the run — and none of section 4 is restated here.
 
-		It speaks outright rather than late, unlike everything else the window
-		asks for. Nothing takes the focus: the window stands, the label changes
-		under a cursor that does not move, and NVDA will not announce the node
-		of its own accord. The word is the only proof there is, so the rule of
-		silence is not bent by it — that rule forbids a second word over a proof
-		NVDA is already giving (sections 5 and 6).
+		It says nothing of the status, and the rule of silence holds here with no
+		exception (section 5). The window updates the label of the node
+		afterwards, and that label changes **under the focus**: NVDA takes it
+		for a change of name on the focused node and reads the node again, new
+		prefix first. Saying the word as well was what this did at first, and a
+		real build showed what it cost — the status spoken twice, once alone and
+		once inside the node NVDA had reread.
+
+		What is left is what section 4 will not let go, and it is the same pair
+		the dialog save keeps: a write that did not reach the disk speaks, every
+		time, and the end of a run speaks because it is news about the run
+		rather than about the window.
 
 		Auto-advance is not called, for the reason the item dialog does not call
 		it either (section 4): the window is a deliberate stop, and what the
@@ -875,7 +881,6 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 			return
 		if not self._write(loaded, lambda: item.record_status(status.cycled(item.status))):
 			return
-		ui.message(wording.status_word(item.status))
 		self._announce_completion(loaded)
 
 	def _reset_all(self) -> None:

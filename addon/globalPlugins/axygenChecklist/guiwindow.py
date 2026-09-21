@@ -185,10 +185,9 @@ def show(
 	write failed (sections 4 and 5.3).
 
 	`on_cycle` is called with the item "Next status" was pressed on, and gives
-	it the next status of the cycle (section 5.1). It is the one thing the
-	window asks for that speaks while the window still stands, and the rule of
-	silence is not bent for it: nothing announces a node whose label changes
-	under a cursor that has not moved, so the word is the only proof there is.
+	it the next status of the cycle (section 5.1). It says nothing of the
+	status: the label written afterwards changes under the focus, so NVDA
+	rereads the node with its new prefix, and that is the proof.
 	"""
 
 	def build_and_hold(parent: wx.Window) -> "_ChecklistWindow":
@@ -778,6 +777,11 @@ class _ChecklistWindow(DpiScalingHelperMixinWithoutInit, wx.Dialog):
 		next, what reaches the disk and what is spoken all belong to the plugin,
 		as they do for every other change of data the window asks for; what is
 		left here is the label, which is the window's own (section 5.2).
+
+		The label is also what speaks. It changes under the focus, so NVDA
+		takes it for a change of name on the focused node and reads the node
+		again — which is why neither this nor the plugin says a word of its own
+		(section 5.1).
 		"""
 		# The node and what it stands for come from the one lookup, so that the
 		# label written below is the label of the item that was just changed.
@@ -795,8 +799,10 @@ class _ChecklistWindow(DpiScalingHelperMixinWithoutInit, wx.Dialog):
 		# that did not reach the disk still shows what is in memory — the rule
 		# section 4 accepts by name, and the same one a save from the dialog
 		# follows (section 5.2). Nothing else is refreshed: the comment has not
-		# changed, the node is the same kind of node, and the comment signal
-		# belongs to announcing a node rather than to something happening in it.
+		# changed and the node is the same kind of node. The comment signal is
+		# left out on purpose even though NVDA does reread the node here — it
+		# marks landing on a node the tester has yet to learn about, and the
+		# focus has not moved (section 5.1).
 		self._tree.SetItemText(node, wording.tree_label(item))
 
 	def _on_browse(self, event: wx.CommandEvent) -> None:
