@@ -119,8 +119,9 @@ def status_word(value: str) -> str:
 def focus_target_label(value: str) -> str:
 	"""The label a tester reads for the focus target `value` (section 3.3.1).
 
-	`value` is one of `preferences.FOCUS_TARGETS`; `option()` in the config spec
-	admits nothing else, so there is no fourth answer to give.
+	`value` is one of `preferences.FOCUS_TARGETS`; `preferences.initial_focus`
+	admits nothing else — the config spec does not, and says there why — so
+	there is no fourth answer to give.
 
 	**The words are the labels of the fields themselves**, not sentences about
 	them: section 3.3.1 asks for *"Item"*, *"Status"*, *"Comment"* and nothing

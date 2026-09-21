@@ -74,6 +74,12 @@ SECTION = "axygenChecklist"
 #: Whether a verdict moves the position on to the next visible item (section 4).
 AUTO_ADVANCE = "autoAdvance"
 
+#: What auto-advance is when `config.conf` does not say otherwise (section 4).
+#: Named rather than spelled twice: the spec string below and the fall back in
+#: `_stored` have to be the same value, or a configuration the add-on could not
+#: read would answer differently from one that never mentioned the key at all.
+AUTO_ADVANCE_DEFAULT = True
+
 #: Which field of the item dialog holds the focus when it opens (section 3.3.1).
 INITIAL_FOCUS = "initialFocus"
 
@@ -89,7 +95,7 @@ FOCUS_COMMENT = "comment"
 FOCUS_TARGETS = (FOCUS_ITEM, FOCUS_STATUS, FOCUS_COMMENT)
 
 config.conf.spec[SECTION] = {
-	AUTO_ADVANCE: "boolean(default=True)",
+	AUTO_ADVANCE: f"boolean(default={AUTO_ADVANCE_DEFAULT})",
 	# `string` rather than `option(…)`, though the value is one of three and
 	# `option` is exactly the check configobj has for that. It buys nothing
 	# here and costs the window: see `initial_focus`.
@@ -104,8 +110,17 @@ def auto_advance() -> bool:
 	the add-on's own, because the value is NVDA's: a profile switch changes it
 	without anything here being told, and the GUI checkbox of section 5 writes
 	it from the other side.
+
+	**A value that will not read comes back as the default**; `_stored` says how
+	and why. It matters more here than at the other preference, and section 4
+	says so: this is the one read that happens *mid-run*, while a status is being
+	recorded and the focus is in the application under test. The exception would
+	land between the tester's keystroke and the word of the status they are
+	waiting for — the failure section 2 names when it argues for strict type
+	checks, and the reason auto-advance may not be read any less carefully than
+	the dialog's opening field.
 	"""
-	return bool(_section()[AUTO_ADVANCE])
+	return bool(_stored(AUTO_ADVANCE, AUTO_ADVANCE_DEFAULT))
 
 
 def set_auto_advance(enabled: bool) -> None:
@@ -128,7 +143,7 @@ def initial_focus() -> str:
 
 	**The answer is always one of the three, and this is the one place that is
 	made true.** `config.conf` is a text file a tester may edit by hand, so the
-	value read back is whatever is in it.
+	value read back is whatever is in it — when it reads back at all (`_stored`).
 
 	**Which is why the spec above says `string` and not `option(…)`.** The
 	obvious spelling declares the three to configobj — and then does nothing
@@ -144,10 +159,18 @@ def initial_focus() -> str:
 	`option` would have bought it for us in exchange for a declaration nobody
 	reads.
 
-	So the set is enforced here, in Python, once. Both callers may then map the
-	three to three fields and need no branch for a value they have never seen.
+	**`string` narrows that hole rather than closing it**, which is what
+	`_stored` is for and what section 3.3.1 now records. A comma makes configobj
+	parse the value as a *list* before any check runs — a hand-edited
+	`initialFocus = item, status` arrives as `['item', 'status']` — and `string`
+	raises on that exactly as `option` raised on `note`. What `string` buys is
+	the common case, not immunity.
+
+	So the set is enforced here, in Python, over whatever `_stored` managed to
+	hand back. Both callers may then map the three to three fields and need no
+	branch for a value they have never seen.
 	"""
-	stored = _section()[INITIAL_FOCUS]
+	stored = _stored(INITIAL_FOCUS, FOCUS_COMMENT)
 	return str(stored) if stored in FOCUS_TARGETS else FOCUS_COMMENT
 
 
@@ -158,6 +181,46 @@ def set_initial_focus(target: str) -> None:
 	reasons; saving the file is not ours to do — see the module docstring.
 	"""
 	_section()[INITIAL_FOCUS] = target
+
+
+def _stored(key: str, default: object) -> object:
+	"""What `config.conf` holds for `key`, or `default` when that will not read.
+
+	One mechanism for both preferences, which is what sections 4 and 3.3.1 ask
+	for: `config.conf` is a text file edited by hand, and there must not be two
+	answers to what becomes of a value the add-on cannot read.
+
+	**Reading raises, and that is the whole reason this exists.**
+	`Validator.check` hands back the spec default only for a key that is
+	*missing*; a key that is present and unreadable raises instead. NVDA's
+	`AggregatedSection._cacheLeaf` calls it without `missing=True`, and the
+	`__getitem__` around it catches only `KeyError` and `TypeError`, so the
+	exception travels to us. Nothing upstream repairs it either — NVDA validated
+	`config.conf` long before this module registered its spec — and nothing is
+	cached on the way out, so the failure repeats on every read rather than
+	spending itself once.
+
+	**`except Exception` is deliberate, and the breadth is the cheaper half of
+	the trade.** The classes that actually arrive are siblings rather than one
+	subclass of the other: `boolean` raises `VdtTypeError` for
+	`autoAdvance = maybe`, `option` raised `VdtValueError` for a word outside its
+	set, and a list — which a comma in any value produces — raises
+	`VdtTypeError` against either spelling. Naming them means importing
+	`configobj.validate`, which NVDA ships at runtime but its source tree does
+	not carry, so the CI type check cannot resolve it; and importing a bundled
+	third-party module for real is the bet the note on `AggregatedSection` above
+	refuses, where a move upstream would stop the add-on loading at all. The
+	body being one subscript, there is no second failure for the clause to
+	swallow.
+
+	`default` is the value the spec declares, not a second opinion about it: a
+	configuration the add-on could not read has to answer as one that never
+	mentioned the key.
+	"""
+	try:
+		return _section()[key]
+	except Exception:
+		return default
 
 
 def _section() -> "AggregatedSection":
