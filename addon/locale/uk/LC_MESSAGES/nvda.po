@@ -57,6 +57,17 @@ msgstr "Скасувати"
 msgid "Axygen Checklist"
 msgstr "Axygen Checklist"
 
+#. Translators: The label of the tab of the add-on's window holding the checklist
+#. file, the tree and everything the checklist is walked with. It is deliberately
+#. not "Checklist", which is the name of the tree inside it.
+msgid "Run"
+msgstr "Прогін"
+
+#. Translators: The label of the tab of the add-on's window holding the options of
+#. the add-on.
+msgid "Settings"
+msgstr "Налаштування"
+
 #. Translators: The label of the tree of the add-on's window, which holds every
 #. section of the checklist and every item in them.
 msgid "Checklist"
@@ -74,6 +85,11 @@ msgstr "Коментар"
 #. option is on the A key of the command mode.
 msgid "Automatically move to the next item after marking one"
 msgstr "Автоматично переходити до наступного пункту після відмітки"
+
+#. Translators: The label of the control of the add-on's settings that chooses which
+#. field of the item dialog has the focus when that dialog opens.
+msgid "Field focused when an item is opened"
+msgstr "Поле у фокусі при відкритті пункту"
 
 #. Translators: The label of the button of the add-on's window that opens the
 #. selected checklist item in the item dialog. The letter after the ampersand is

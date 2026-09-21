@@ -70,8 +70,8 @@ out again here.
 `CreateButtonSizer` and bare stock ids are forbidden by section 3.3.1: it
 takes the wording from wxWidgets' own catalogues, which never reach the
 catalogue of the add-on (section 6), it does not know `wx.ID_SAVE` among its
-buttons at all, and it takes the focus for itself — against the one thing the
-window must open with, the focus in *"Comment"*.
+buttons at all, and it takes the focus for itself — against the field the
+window is asked to open on, which is never one of the buttons (`_open_focused`).
 
 **There is no default button**, and plain Enter therefore saves nowhere. In the
 multi-line comment Enter inserts a line (wxMSW gives such controls
@@ -110,7 +110,7 @@ from gui import guiHelper
 from gui.dpiScalingHelper import DpiScalingHelperMixinWithoutInit
 from logHandler import log
 
-from . import layout, modal, wording
+from . import layout, modal, preferences, wording
 from .core import status
 from .core.checklist import Item
 
@@ -190,7 +190,7 @@ class _ItemDialog(DpiScalingHelperMixinWithoutInit, wx.Dialog):
 		main = wx.BoxSizer(wx.VERTICAL)
 		contents = guiHelper.BoxSizerHelper(self, orientation=wx.VERTICAL)
 		read_only_size = self.scaleSize((guiHelper.COMPLEX_DIALOG_WIDTH, _READ_ONLY_HEIGHT))
-		item_field, _control = layout.label_above(
+		item_field, self._item = layout.label_above(
 			self,
 			# Translators: The label of the read-only field of the item dialog holding the
 			# whole text of the checklist item.
@@ -284,13 +284,47 @@ class _ItemDialog(DpiScalingHelperMixinWithoutInit, wx.Dialog):
 				],
 			),
 		)
-		# Where the window opens (section 3.3.1): in the comment, with the
-		# caret after whatever is already there and nothing selected — a
-		# selection would go under the first letter typed, taking the comment
-		# with it.
-		self._comment.SetFocus()
-		self._comment.SetInsertionPointEnd()
+		self._open_focused()
 		self.CentreOnScreen()
+
+	def _open_focused(self) -> None:
+		"""Put the focus where the tester asked it to go (section 3.3.1).
+
+		One of three fields, and each of them wants the caret somewhere
+		different, so the three stand here together rather than as a target
+		looked up and focused blindly.
+
+		**Every branch settles the caret, and none may be left out.** On wxMSW
+		the dialog focuses its first focusable child on activation through
+		`SetFocusFromKbd()`, which on that platform is `SetFocus()` *plus* an
+		explicit select-all (`wxWindowMSW::SetFocusFromKbd`, `src/msw/window.cpp`);
+		the first in this window's Tab walk is *"Item"*. NVDA speaks a field that
+		came up selected as `_("selected %s")` rather than as its text, so an
+		unattended caret is not an untidiness but a field announced as the wrong
+		thing.
+
+		Called last in `__init__`, which is where NVDA's own windows call
+		`SetFocus` — `postInit` for its settings dialogs, the end of the
+		constructor everywhere else — and it holds through the activation above.
+		"""
+		target = preferences.initial_focus()
+		if target == preferences.FOCUS_ITEM:
+			self._item.SetFocus()
+			# The start, not the end: a read-only field is read from the top,
+			# which is the reason NVDA gives for the same call in its own
+			# Add-on Store. Collapsing the selection is the other half — see
+			# above.
+			self._item.SetInsertionPoint(0)
+		elif target == preferences.FOCUS_STATUS:
+			# Nothing beyond the focus: a combo box has no caret to place.
+			self._status.SetFocus()
+		else:
+			# The comment, which is the default and was the whole of this rule
+			# before it became a preference: the caret after whatever is already
+			# there and nothing selected — a selection would go under the first
+			# letter typed, taking the comment with it.
+			self._comment.SetFocus()
+			self._comment.SetInsertionPointEnd()
 
 	@property
 	def chosen_status(self) -> str:

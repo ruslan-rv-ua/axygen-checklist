@@ -24,6 +24,13 @@ It has the two columns section 2 draws it with, and they travel as one row
 and a row is what makes the asking mechanical: a sixth status is one place to
 add it rather than two, of which one would eventually be missed.
 
+**What the fields of the item dialog are called**, on the one occasion they are
+named somewhere other than beside themselves: the choice of section 3.3.1, which
+decides where that dialog opens. The words are the field labels and nothing more
+elaborate, so the same rule applies as to the statuses — one field, one word —
+and they are here rather than in the window because the window would otherwise
+word a second time what the dialog has already worded once.
+
 **What a tester hears about one item.** Sections 3.1 and 3.3 both speak an item
 — on landing on it after a move, and on being asked to say it again — and
 section 3.1 says outright that the two are the same. So the sentence is built
@@ -73,6 +80,7 @@ from typing import NamedTuple
 
 import addonHandler
 
+from . import preferences
 from .core import status
 from .core.checklist import Change, CommentChange, Item, Problem, ProblemKind
 from .core.progress import Progress
@@ -106,6 +114,40 @@ def status_word(value: str) -> str:
 	item dialog is read-only so that nothing else can be written back.
 	"""
 	return _status_words(value).word
+
+
+def focus_target_label(value: str) -> str:
+	"""The label a tester reads for the focus target `value` (section 3.3.1).
+
+	`value` is one of `preferences.FOCUS_TARGETS`; `option()` in the config spec
+	admits nothing else, so there is no fourth answer to give.
+
+	**The words are the labels of the fields themselves**, not sentences about
+	them: section 3.3.1 asks for *"Item"*, *"Status"*, *"Comment"* and nothing
+	more elaborate, by the rule that makes the status dictionary one table for
+	the whole add-on — one field, one word. They are therefore the same three
+	`msgid`s the item dialog labels its fields with, which is how *"Comment"*
+	already reaches both that dialog and the panel of the GUI window (section
+	5): one catalogue entry, however many places ask for it.
+
+	Built on each call rather than once at import, for the reason
+	`_status_words` is: the words follow the interface language NVDA is running
+	now.
+	"""
+	return {
+		# Translators: One of the fields the item dialog can open on, named in the add-on's
+		# settings. It is the label of the read-only field holding the item text, and has to
+		# read exactly as that label does.
+		preferences.FOCUS_ITEM: _("Item"),
+		# Translators: One of the fields the item dialog can open on, named in the add-on's
+		# settings. It is the label of the combo box holding the status, and has to read
+		# exactly as that label does.
+		preferences.FOCUS_STATUS: _("Status"),
+		# Translators: One of the fields the item dialog can open on, named in the add-on's
+		# settings. It is the label of the field the comment is written in, and has to read
+		# exactly as that label does.
+		preferences.FOCUS_COMMENT: _("Comment"),
+	}[value]
 
 
 def tree_label(item: Item) -> str:

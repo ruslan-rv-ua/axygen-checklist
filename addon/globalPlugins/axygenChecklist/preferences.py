@@ -5,7 +5,15 @@
 
 """What the tester prefers, kept where NVDA keeps what its own users prefer.
 
-Section 4 of docs/requirements.md puts auto-advance in
+There are two of them: auto-advance (section 4) and which field the item dialog
+opens on (section 3.3.1). Both are toggled on the *"Settings"* tab of the
+add-on's own window (section 5), and that tab is where every later one goes as
+well — section 7.3 refuses a category in NVDA's own settings **permanently**,
+on three grounds none of which is the number of rows: the transactional frame
+of `SettingsPanel`, the race a `Show()`n panel keeps with the `A` key, and a
+permanent row in the category list of everyone who installed the add-on.
+
+Section 4 puts auto-advance in
 `config.conf["axygenChecklist"]["autoAdvance"]`, spelled `boolean(default=True)`
 and registered through `config.conf.spec`. Neither of the two other files the
 add-on writes would do. `state.json` (section 2) is an internal cache of the
@@ -17,6 +25,12 @@ own moment of reaching the disk. The same deference the timings are held to
 
 **The default is on.** Auto-advance is the main working loop of the product,
 and every step of it is spoken, so it is never a surprise.
+
+**The default focus is the comment**, which is what that rule was before it
+became a preference. Section 3.3.1 records that this second preference rests on
+no named defect — testers simply open that window for different reasons — and
+keeps it as small as a preference can be in consequence: one dialog, three
+fields, no key of its own.
 
 **The value belongs to the active NVDA profile, not to the add-on.** Writing to
 `config.conf[section][key]` lands in the most recently activated profile
@@ -60,7 +74,32 @@ SECTION = "axygenChecklist"
 #: Whether a verdict moves the position on to the next visible item (section 4).
 AUTO_ADVANCE = "autoAdvance"
 
-config.conf.spec[SECTION] = {AUTO_ADVANCE: "boolean(default=True)"}
+#: Which field of the item dialog holds the focus when it opens (section 3.3.1).
+INITIAL_FOCUS = "initialFocus"
+
+#: The three fields the item dialog may open on, in the order they stand in it
+#: (section 3.3.1). Identifiers, not words: what a tester hears for each of them
+#: is the label of the field itself, and `wording.focus_target_label` says it.
+#: *"Note"* is deliberately absent — it is missing from most items, so a choice
+#: naming it would mean something other than itself on most of them, and would
+#: need a rule for falling back; these three are always there.
+FOCUS_ITEM = "item"
+FOCUS_STATUS = "status"
+FOCUS_COMMENT = "comment"
+FOCUS_TARGETS = (FOCUS_ITEM, FOCUS_STATUS, FOCUS_COMMENT)
+
+config.conf.spec[SECTION] = {
+	AUTO_ADVANCE: "boolean(default=True)",
+	# `option` rather than `string`, so that configobj's own validator refuses
+	# anything outside the three and hands back the default instead. The add-on
+	# then never has to ask whether what it read is a field it has: the same
+	# guard `wx.CB_READONLY` gives the status combo box of section 3.3.1, one
+	# layer down and for free.
+	INITIAL_FOCUS: "option({}, default={})".format(
+		", ".join(f'"{target}"' for target in FOCUS_TARGETS),
+		f'"{FOCUS_COMMENT}"',
+	),
+}
 
 
 def auto_advance() -> bool:
@@ -83,6 +122,29 @@ def set_auto_advance(enabled: bool) -> None:
 	not ours to do — see the module docstring.
 	"""
 	_section()[AUTO_ADVANCE] = enabled
+
+
+def initial_focus() -> str:
+	"""Which field the item dialog opens on — one of `FOCUS_TARGETS` (section 3.3.1).
+
+	Asked when the dialog is built rather than held here, for the reason
+	`auto_advance` is asked when a status is recorded: the value is NVDA's, and
+	a profile switch changes it without anything here being told.
+
+	The answer is always one of the three. `option()` in the spec above makes
+	that configobj's job, so the caller may map the three to three fields and
+	need no fourth branch for a value it has never heard of.
+	"""
+	return str(_section()[INITIAL_FOCUS])
+
+
+def set_initial_focus(target: str) -> None:
+	"""Open the item dialog on `target` from now on, in `config.conf` (section 3.3.1).
+
+	Assignment and nothing else, as `set_auto_advance` is and for the same
+	reasons; saving the file is not ours to do — see the module docstring.
+	"""
+	_section()[INITIAL_FOCUS] = target
 
 
 def _section() -> "AggregatedSection":

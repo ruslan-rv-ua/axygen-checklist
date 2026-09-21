@@ -276,19 +276,33 @@ class _Node:
 
 
 class _ChecklistWindow(DpiScalingHelperMixinWithoutInit, wx.Dialog):
-	"""The window itself: the tree, the comment of what is selected, four buttons.
+	"""The window itself: two tabs, and "Close" alone in the footer under them.
 
 	Built fresh on every way in and filled once, because there is no second
 	way in while it stands.
 
+	**Tab *"Run"* is the working surface** and **tab *"Settings"* is the home of
+	the preferences** (section 7.3). The split is not for the two controls on it
+	today: a panel in NVDA's own settings is refused for good, so this is where
+	every preference the add-on ever grows will arrive.
+
 	**Every button stands beside the thing it acts on** (section 5), and the
-	order things are built in here is the Tab order the tester walks: the file
-	row, then "Reset all progress" because it acts on the file, then the tree
-	with "Open item" and "Move to" in a column against it because they act on
-	the selected node, then the comment panel, the checkbox, and "Close" alone
-	in the footer. Reading order and Tab order are the same thing, which is
-	what a sighted keyboard user and a magnifier user need and what a screen
-	reader user gets for free.
+	order things are built in here is the Tab order the tester walks: on the run
+	page, the file row, then "Reset all progress" because it acts on the file,
+	then the tree with the three node buttons in a column against it because
+	they act on the selected node, then the comment panel. Reading order and Tab
+	order are the same thing, which is what a sighted keyboard user and a
+	magnifier user need and what a screen reader user gets for free.
+
+	**The tab strip costs a word at every entry, and the price is accepted.** A
+	`wx.Notebook` is a native tab control on wxMSW, and NVDA counts a tab
+	control among the ancestors it announces (`isPresentableFocusAncestor`
+	excludes four roles and this is not one of them), so the tree is reached
+	through "tab control" and the name of the page. There is no hook for
+	silencing that in a window of one's own — NVDA does it in app modules for
+	*other* applications — and section 7.3 weighs it against the alternative: a
+	standing word entering our own window, against a standing row in NVDA's
+	category list for everyone who installed the add-on.
 
 	Sized the way section 6 sizes every window of the add-on: NVDA's own width
 	for a window that is not a message, scaled to the screen this one is on,
@@ -340,13 +354,40 @@ class _ChecklistWindow(DpiScalingHelperMixinWithoutInit, wx.Dialog):
 		#: door, after a `Browse...` and after a reset, and sections 5 and 5.3
 		#: have all three of them silent.
 		self._filling = False
-		# A dialog carries `wx.TAB_TRAVERSAL` itself, so there is no panel here
-		# and nothing to hold one: that panel existed only to give a frame the
-		# Tab walk it has not got (sections 5 and 6).
-		contents = guiHelper.BoxSizerHelper(self, orientation=wx.VERTICAL)
-		contents.addItem(self._build_browse_row(), flag=wx.EXPAND)
+		# Two tabs, because this window is the home of the preferences (section
+		# 7.3) and a home wants a room for them: a settings panel in NVDA's own
+		# dialog is refused for good, so every preference the add-on ever grows
+		# arrives here, and without a room of their own they would pile up under
+		# the working surface.
+		#
+		# The page is named *"Run"* and not *"Checklist"* on purpose: the tree
+		# inside it is already called *"Checklist"* (section 5 makes that name
+		# normative), and the same string twice would open the window with
+		# "Checklist... Checklist, tree".
+		notebook = wx.Notebook(self)
+		run_page = wx.Panel(notebook)
+		settings_page = wx.Panel(notebook)
+		notebook.AddPage(
+			run_page,
+			# Translators: The label of the tab of the add-on's window holding the checklist
+			# file, the tree and everything the checklist is walked with. It is deliberately
+			# not "Checklist", which is the name of the tree inside it.
+			_("Run"),
+		)
+		notebook.AddPage(
+			settings_page,
+			# Translators: The label of the tab of the add-on's window holding the options of
+			# the add-on.
+			_("Settings"),
+		)
+		# Everything of the run page is parented to the page rather than to the
+		# dialog, and the order it is created in is still the Tab order the
+		# tester walks — within the page, which is where the rule of section 6
+		# about a label naming the control after it is measured.
+		contents = guiHelper.BoxSizerHelper(run_page, orientation=wx.VERTICAL)
+		contents.addItem(self._build_browse_row(run_page), flag=wx.EXPAND)
 		self._reset_all = wx.Button(
-			self,
+			run_page,
 			# Translators: The label of the button of the add-on's window that puts every item
 			# of the checklist back to not checked and erases every comment. The letter after
 			# the ampersand is the mnemonic that activates it.
@@ -361,7 +402,7 @@ class _ChecklistWindow(DpiScalingHelperMixinWithoutInit, wx.Dialog):
 		# NVDA reads and the name of the field itself hang on (section 6).
 		contents.addItem(self._reset_all)
 		tree = guiHelper.LabeledControlHelper(
-			self,
+			run_page,
 			# Translators: The label of the tree of the add-on's window, which holds every
 			# section of the checklist and every item in them.
 			_("Checklist"),
@@ -387,7 +428,7 @@ class _ChecklistWindow(DpiScalingHelperMixinWithoutInit, wx.Dialog):
 		# it **in the Tab order**, so a button dropped in there would leave the
 		# tree announcing itself as a tree and nothing more (section 6).
 		self._open_item = wx.Button(
-			self,
+			run_page,
 			# Translators: The label of the button of the add-on's window that opens the
 			# selected checklist item in the item dialog. The letter after the ampersand is
 			# the mnemonic that activates it.
@@ -395,7 +436,7 @@ class _ChecklistWindow(DpiScalingHelperMixinWithoutInit, wx.Dialog):
 		)
 		self._open_item.Bind(wx.EVT_BUTTON, self._on_open_item)
 		self._move_to = wx.Button(
-			self,
+			run_page,
 			# Translators: The label of the button of the add-on's window that makes the
 			# selected node the current position and closes the window. It deliberately
 			# repeats the wording of NVDA's own Elements List. The letter after the ampersand
@@ -404,7 +445,7 @@ class _ChecklistWindow(DpiScalingHelperMixinWithoutInit, wx.Dialog):
 		)
 		self._move_to.Bind(wx.EVT_BUTTON, self._on_move_to)
 		self._next_status = wx.Button(
-			self,
+			run_page,
 			# Translators: The label of the button of the add-on's window that gives the
 			# selected checklist item the next status of the cycle. The letter after the
 			# ampersand is the mnemonic that activates it.
@@ -425,7 +466,7 @@ class _ChecklistWindow(DpiScalingHelperMixinWithoutInit, wx.Dialog):
 		# the tree is the only thing in it that grows (section 6).
 		contents.addItem(tree_row, flag=wx.EXPAND, proportion=1)
 		comment_panel, self._comment = layout.label_above(
-			self,
+			run_page,
 			# Translators: The label of the read-only panel under the tree of the add-on's
 			# window, which shows the comment left on the selected checklist item.
 			_("Comment"),
@@ -439,20 +480,13 @@ class _ChecklistWindow(DpiScalingHelperMixinWithoutInit, wx.Dialog):
 		# is `layout`'s to say — and until now these two neighbours wore theirs
 		# two different ways.
 		contents.addItem(comment_panel, flag=wx.EXPAND)
-		auto_advance_box = contents.addItem(
-			wx.CheckBox(
-				self,
-				# Translators: The label of the checkbox of the add-on's window that turns on and
-				# off moving to the next checklist item once this one has a verdict. The same
-				# option is on the A key of the command mode.
-				label=_("Automatically move to the next item after marking one"),
-			),
-		)
-		# It opens at whatever the option is (section 4), and it is not kept,
-		# for the reason the `Browse...` button is not: nothing in here changes
-		# it again. What happens when the tester does is `_on_auto_advance`'s.
-		auto_advance_box.SetValue(preferences.auto_advance())
-		auto_advance_box.Bind(wx.EVT_CHECKBOX, self._on_auto_advance)
+		self._lay_out_page(run_page, contents)
+		self._build_settings_page(settings_page)
+		# The footer belongs to the dialog and not to either page: "Close"
+		# dismisses the **window**, so a copy of it riding on a page would go
+		# missing from the other one.
+		footer = guiHelper.BoxSizerHelper(self, orientation=wx.VERTICAL)
+		footer.addItem(notebook, flag=wx.EXPAND, proportion=1)
 		close = wx.Button(
 			self,
 			id=wx.ID_CANCEL,
@@ -468,9 +502,9 @@ class _ChecklistWindow(DpiScalingHelperMixinWithoutInit, wx.Dialog):
 		# pushed **left** — the only such row among the windows a tester sees
 		# side by side. Now that "Close" stands alone, the call gives the
 		# footer every NVDA window has: pushed right, ruled off from the rest.
-		contents.addDialogDismissButtons(close, separated=True)
+		footer.addDialogDismissButtons(close, separated=True)
 		main = wx.BoxSizer(wx.VERTICAL)
-		main.Add(contents.sizer, border=guiHelper.BORDER_FOR_DIALOGS, flag=wx.ALL | wx.EXPAND, proportion=1)
+		main.Add(footer.sizer, border=guiHelper.BORDER_FOR_DIALOGS, flag=wx.ALL | wx.EXPAND, proportion=1)
 		main.Fit(self)
 		self.SetSizer(main)
 		# The size `Fit` just settled is the floor (section 6): a window that
@@ -486,11 +520,73 @@ class _ChecklistWindow(DpiScalingHelperMixinWithoutInit, wx.Dialog):
 		self.SetEscapeId(wx.ID_CANCEL)
 		self._fill(checklist, position)
 		# Where the window opens (section 5): on the tree, which is the window.
-		# The row above it is first in the Tab walk and last to want the focus.
+		# The row above it is first in the Tab walk and last to want the focus,
+		# and so is the tab strip now in front of both — the tab is switched
+		# rarely, and the tree is what the window is opened for.
 		self._tree.SetFocus()
 		self.CentreOnScreen()
 
-	def _build_browse_row(self) -> wx.Sizer:
+	def _lay_out_page(self, page: wx.Panel, contents: guiHelper.BoxSizerHelper) -> None:
+		"""Give `page` the sizer `contents` built, inside the usual dialog border.
+
+		The border is the one every window of the add-on stands in
+		(`guiHelper.BORDER_FOR_DIALOGS`), and it is applied per page rather than
+		once around the notebook: a page is the thing a control is drawn in, and
+		a single border outside the tabs would leave every control flush against
+		the edge of its own page.
+		"""
+		sizer = wx.BoxSizer(wx.VERTICAL)
+		sizer.Add(contents.sizer, border=guiHelper.BORDER_FOR_DIALOGS, flag=wx.ALL | wx.EXPAND, proportion=1)
+		page.SetSizer(sizer)
+
+	def _build_settings_page(self, page: wx.Panel) -> None:
+		"""The *"Settings"* tab: what the tester prefers, and nothing else (section 5).
+
+		Both preferences the add-on has, and the place every later one goes:
+		section 7.3 refuses a category in NVDA's own settings for good, so this
+		page is where they live.
+
+		**Both apply the moment they are changed**, because this window has no
+		OK and never will (section 5) — a set of changes waiting to be confirmed
+		does not exist in it, any more than a deferred write exists in section 2.
+		Neither says anything of its own either: NVDA announces the new state of
+		a control that was just changed, and that is the proof; a second word
+		over the top of it is the noise section 5 keeps out.
+		"""
+		contents = guiHelper.BoxSizerHelper(page, orientation=wx.VERTICAL)
+		auto_advance_box = contents.addItem(
+			wx.CheckBox(
+				page,
+				# Translators: The label of the checkbox of the add-on's window that turns on and
+				# off moving to the next checklist item once this one has a verdict. The same
+				# option is on the A key of the command mode.
+				label=_("Automatically move to the next item after marking one"),
+			),
+		)
+		# It opens at whatever the option is (section 4), and it is not kept,
+		# for the reason the `Browse...` button is not: nothing in here changes
+		# it again. What happens when the tester does is `_on_auto_advance`'s.
+		auto_advance_box.SetValue(preferences.auto_advance())
+		auto_advance_box.Bind(wx.EVT_CHECKBOX, self._on_auto_advance)
+		# `wx.Choice` rather than the read-only combo box the item dialog picks
+		# its status with (section 3.3.1): that style was chosen there against a
+		# named danger — a typo writing an unknown value into `status`, which
+		# section 2 makes fatal — and there is no such danger here. It is also
+		# what NVDA's own settings panels offer a choice with. The label stays
+		# beside it, since the rule that puts a label above a box measures the
+		# height of the box and this one is a line tall (section 6).
+		self._initial_focus: wx.Choice = contents.addLabeledControl(
+			# Translators: The label of the control of the add-on's settings that chooses which
+			# field of the item dialog has the focus when that dialog opens.
+			_("Field focused when an item is opened"),
+			wx.Choice,
+			choices=[wording.focus_target_label(target) for target in preferences.FOCUS_TARGETS],
+		)
+		self._initial_focus.SetSelection(preferences.FOCUS_TARGETS.index(preferences.initial_focus()))
+		self._initial_focus.Bind(wx.EVT_CHOICE, self._on_initial_focus)
+		self._lay_out_page(page, contents)
+
+	def _build_browse_row(self, parent: wx.Window) -> wx.Sizer:
 		"""The first row of the window: the file that is open, and the way to another.
 
 		Section 5 puts this first in the window, and the order **inside** it is
@@ -515,7 +611,7 @@ class _ChecklistWindow(DpiScalingHelperMixinWithoutInit, wx.Dialog):
 		pair the item dialog already stands on (section 3.3.1).
 		"""
 		label = wx.StaticText(
-			self,
+			parent,
 			# Translators: The label of the field of the add-on's window that holds the path
 			# of the checklist which is open. The button beside it picks another file.
 			label=_("Checklist file"),
@@ -525,7 +621,7 @@ class _ChecklistWindow(DpiScalingHelperMixinWithoutInit, wx.Dialog):
 		# is left of it once the label and the button have theirs. A width of
 		# its own would make this row the widest thing in the window and widen
 		# the window to suit.
-		self._path = wx.TextCtrl(self, style=wx.TE_READONLY | wx.TE_MULTILINE | wx.TE_NO_VSCROLL)
+		self._path = wx.TextCtrl(parent, style=wx.TE_READONLY | wx.TE_MULTILINE | wx.TE_NO_VSCROLL)
 		# The height is the other half of "drawn as an ordinary field" (section
 		# 5): left alone, a multiline box comes out two lines and more. The one
 		# line it is held to is asked of the control rather than counted in
@@ -537,7 +633,7 @@ class _ChecklistWindow(DpiScalingHelperMixinWithoutInit, wx.Dialog):
 			wx.Size(-1, self._path.GetSizeFromTextSize(-1, self._path.GetCharHeight()).height),
 		)
 		browse = wx.Button(
-			self,
+			parent,
 			# Translators: The label of the button of the add-on's window that picks the
 			# checklist file to open. It deliberately repeats NVDA's own label for a button
 			# that browses for a path, so the Ukrainian catalogue has to repeat it too.
@@ -882,6 +978,21 @@ class _ChecklistWindow(DpiScalingHelperMixinWithoutInit, wx.Dialog):
 		NVDA's own.
 		"""
 		preferences.set_auto_advance(event.IsChecked())
+
+	def _on_initial_focus(self, event: wx.CommandEvent) -> None:
+		"""Another field was picked to open the item dialog on (section 3.3.1).
+
+		The same shape as `_on_auto_advance` and for the same reasons: written
+		out to `preferences` the moment it is chosen, because this window has no
+		OK to defer it to; nothing said, because NVDA announces the new value of
+		the control itself and a second word would be noise.
+
+		The identifier is read back from the position rather than from the label
+		shown, which is why `FOCUS_TARGETS` fixes the order the choices are
+		built in. Matching on the label would break in every locale but the one
+		it was written in.
+		"""
+		preferences.set_initial_focus(preferences.FOCUS_TARGETS[event.GetSelection()])
 
 	def _on_open_item(self, event: wx.CommandEvent) -> None:
 		"""Open the item dialog on the selected item (section 5.2).
