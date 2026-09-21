@@ -41,8 +41,15 @@ Keeping that rule free of exceptions is what `_filling` is for.
 to them (section 5.1). Enter opens the item dialog on the selected item, by
 synthesising a click on "Open item" — Enter does not reach a default button
 from a tree (wx ticket #3725), which is the same hole NVDA patches the same
-way in its own Elements List. Ctrl+Enter presses "Move to", through the
-accelerator table, and that one closes the window.
+way in its own Elements List. Ctrl+Enter presses "Move to", and that one
+closes the window.
+
+**Both of those keys belong to the tree and to nothing else in the window**,
+and the handlers hang off the tree so that this is structural rather than a
+test each of them makes (section 5.1). Ctrl+Enter used to be an accelerator
+table on the window, which is why it fired from the path field and the Close
+button alike; a table cannot be narrowed, because it hangs off the window by
+construction and eats the key before the focused control sees it.
 
 **"Reset all progress" is the window's own action**, and the only one that
 reaches every item at once (section 5). It asks first — the same confirmation
@@ -359,6 +366,13 @@ class _ChecklistWindow(DpiScalingHelperMixinWithoutInit, wx.Dialog):
 		self._tree: wx.TreeCtrl = tree.control
 		self._tree.Bind(wx.EVT_TREE_SEL_CHANGED, self._on_selection)
 		self._tree.Bind(wx.EVT_CHAR, self._on_tree_char)
+		# Two key handlers on the one control, and cheaper here than one
+		# (section 6). The hook runs ahead of the ordinary key events, so the
+		# chord is taken first and everything else reaches EVT_CHAR exactly as
+		# it always did — numpad Enter included, which EVT_CHAR hands to plain
+		# Enter for free because the code it reports is the translated
+		# character.
+		self._tree.Bind(wx.EVT_CHAR_HOOK, self._on_tree_chord)
 		# The two buttons of the node, in a column beside the tree they act on
 		# (section 5). Created after the tree, and never between the tree and
 		# its label: the name of a tree is the static text immediately before
@@ -448,22 +462,9 @@ class _ChecklistWindow(DpiScalingHelperMixinWithoutInit, wx.Dialog):
 		# Escape means Close, said out loud rather than left to wx: without this
 		# it goes to the affirmative button when there is no cancel one. A
 		# `wx.Dialog` needs no accelerator table for this, where the frame this
-		# window used to be did (sections 5 and 6).
+		# window used to be did (sections 5 and 6) — and with Ctrl+Enter now a
+		# key of the tree, the window has no accelerator table at all.
 		self.SetEscapeId(wx.ID_CANCEL)
-		# And Ctrl+Enter means "Move to", from wherever the focus is. The
-		# accelerator carries the chord to the same handler the button uses — as
-		# a menu command, which is the event an accelerator raises — so there is
-		# one way to move and not two. Numpad Enter is bound with it, as in the
-		# item dialog and as NVDA checks both codes in its own windows.
-		self.Bind(wx.EVT_MENU, self._on_move_to, id=self._move_to.GetId())
-		self.SetAcceleratorTable(
-			wx.AcceleratorTable(
-				[
-					wx.AcceleratorEntry(wx.ACCEL_CTRL, wx.WXK_RETURN, self._move_to.GetId()),
-					wx.AcceleratorEntry(wx.ACCEL_CTRL, wx.WXK_NUMPAD_ENTER, self._move_to.GetId()),
-				],
-			),
-		)
 		self._fill(checklist, position)
 		# Where the window opens (section 5): on the tree, which is the window.
 		# The row above it is first in the Tab walk and last to want the focus.
@@ -698,9 +699,9 @@ class _ChecklistWindow(DpiScalingHelperMixinWithoutInit, wx.Dialog):
 		five, they have to be told apart by ear, and a sixth is not worth a node
 		NVDA has already named.
 
-		A chord is left alone. Ctrl+Enter belongs to the accelerator table,
-		which takes it before the focused control ever sees it; the guard is
-		here so that nothing depends on that being true of every key.
+		A chord is left alone. Ctrl+Enter is taken by the hook on this same
+		tree, which has run and answered before this event exists at all, and
+		every other chord is somebody else's to answer.
 		"""
 		if event.GetKeyCode() != wx.WXK_RETURN or event.GetModifiers() != wx.MOD_NONE:
 			event.Skip()
@@ -709,6 +710,33 @@ class _ChecklistWindow(DpiScalingHelperMixinWithoutInit, wx.Dialog):
 			wx.Bell()
 			return
 		_ = self._open_item.ProcessEvent(wx.CommandEvent(wx.wxEVT_COMMAND_BUTTON_CLICKED, wx.ID_ANY))
+
+	def _on_tree_chord(self, event: wx.KeyEvent) -> None:
+		"""Ctrl+Enter on the tree: press "Move to" (section 5.1).
+
+		The chord is a key of the tree and of nothing else in the window, and
+		the hook is what makes that structural rather than a test: it hangs off
+		the tree, so it is simply not called while the focus is anywhere else,
+		and the key travels on to whatever control does have the focus
+		untouched. Outside the tree there is no command, so there is nothing to
+		report either — the bell below is for a command that could not be
+		carried out, which is a different thing.
+
+		Both Enter codes are named here, because the hook reports the key
+		untranslated and numpad Enter is a code of its own in it. That is the
+		same reason plain Enter above stays on EVT_CHAR, where the two merge
+		(section 6).
+		"""
+		is_enter = event.GetKeyCode() in (wx.WXK_RETURN, wx.WXK_NUMPAD_ENTER)
+		if not is_enter or event.GetModifiers() != wx.MOD_CONTROL:
+			event.Skip()
+			return
+		# The same shape as plain Enter above, and for the same reason: the key
+		# of a tree fires where the button it leads to cannot be pressed.
+		if not self._move_to.IsEnabled():
+			wx.Bell()
+			return
+		_ = self._move_to.ProcessEvent(wx.CommandEvent(wx.wxEVT_COMMAND_BUTTON_CLICKED, wx.ID_ANY))
 
 	def _on_browse(self, event: wx.CommandEvent) -> None:
 		"""Ask which checklist to open (section 5).
@@ -840,19 +868,17 @@ class _ChecklistWindow(DpiScalingHelperMixinWithoutInit, wx.Dialog):
 		the window has gone, because what is said about the landing has to
 		outlive the window closing (section 6).
 
-		Both ways in arrive here: the button as `EVT_BUTTON`, Ctrl+Enter as the
-		`EVT_MENU` an accelerator raises. Which one the tester used is not a
-		difference worth keeping.
+		Both ways in arrive here as the one event: the button clicked, and the
+		click the tree synthesises for Ctrl+Enter (section 5.1). Which one the
+		tester used is not a difference worth keeping.
 		"""
 		node = self._selected()
 		if node is None or node.position is None:
-			# The button cannot be pressed here — it is disabled wherever there
-			# is nowhere to go — but the chord can: an accelerator table hangs
-			# off the dialog and fires whatever the button's state is. The
-			# answer is the bell a disabled button gets from Enter, for the same
-			# reason section 5.1 gives: the add-on has five tones, they have to
-			# be told apart by ear, and this is not worth a sixth.
-			wx.Bell()
+			# Nothing gets this far. The button is disabled wherever there is
+			# nowhere to go, and the chord asks it that same question before
+			# synthesising the click — so the bell for the case lives there,
+			# beside the one plain Enter rings (section 5.1).
+			log.error("the window was asked to move to a node there is no moving to")
 			return
 		self._chosen = node.position
 		self.EndModal(wx.ID_OK)
