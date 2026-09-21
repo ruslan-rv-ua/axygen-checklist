@@ -263,7 +263,7 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 		super().__init__()
 		#: The one run of the plugin's life: the checklist or its absence, the
 		#: position, the anchor of a series and the file the position is kept
-		#: in between runs of NVDA. Every command is a command of it, and
+		#: across restarts of NVDA. Every command is a command of it, and
 		#: every answer comes back as events for `_narrate` to say.
 		self._run = Run(_state_file())
 		#: The temporary layer the rare commands live behind (section 3.2.2).
@@ -812,6 +812,7 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 				log.error(f"could not read the checklist at {path}", exc_info=error)
 				modal.report(wording.shown_refusal())
 			case [ChecklistGone()]:
+				log.error(f"the checklist at {path} was gone before it could be opened")
 				modal.report(wording.shown_refusal())
 			case _:
 				self._narrate(answer, after_window=True)

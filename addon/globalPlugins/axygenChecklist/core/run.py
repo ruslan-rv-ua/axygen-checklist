@@ -61,10 +61,11 @@ from .session import Session
 class Landed:
 	"""The position moved to `item`, in `section`, and it is spoken (section 3.1).
 
-	`jump` is true for the three deliberate landings the specification has
-	name the section: a jump between sections (section 3.1), "Move to" in the
-	window (section 5.1) and a file just opened (section 3.2.2). A step to
-	the next item, and auto-advance, land with it false.
+	`jump` is true for the three deliberate landings, and the specification
+	has the section named for each of them: a jump between sections (section
+	3.1), "Move to" in the window (section 5.1) and a file just opened
+	(section 3.2.2). A step to the next item, and auto-advance, land with it
+	false, and the section goes unnamed.
 	"""
 
 	item: Item
@@ -230,7 +231,7 @@ class _Standing:
 class Run:
 	"""One run, for the whole life of the plugin.
 
-	`state` is where the position is kept between runs of NVDA (section 2);
+	`state` is where the position is kept across restarts of NVDA (section 2);
 	the path arrives ready, because the core is never told how to find
 	anything. Nothing is opened here: `restore` picks up what `state.json`
 	remembers, and `open` takes the file the tester picked.
@@ -313,14 +314,14 @@ class Run:
 		"""
 		return self._record(status.toggled, advance)
 
-	def assign(self, value: str, advance: bool) -> list[Answer]:
-		"""Give the current item the status `value` outright.
+	def assign(self, status_value: str, advance: bool) -> list[Answer]:
+		"""Give the current item the status `status_value` outright.
 
 		A digit of the command mode (section 3.2.2), and the honest repeat of
-		section 4: nothing here asks whether the item holds `value` already —
-		the write and the word happen either way.
+		section 4: nothing here asks whether the item holds that status
+		already — the write and the word happen either way.
 		"""
-		return self._record(lambda _current: value, advance)
+		return self._record(lambda _current: status_value, advance)
 
 	def _record(self, value_of: Callable[[str], str], advance: bool) -> list[Answer]:
 		"""Give the current item the status `value_of` makes of the one it holds.

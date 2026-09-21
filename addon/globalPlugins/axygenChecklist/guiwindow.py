@@ -883,6 +883,7 @@ class _ChecklistWindow(DpiScalingHelperMixinWithoutInit, wx.Dialog):
 				modal.report(wording.shown_refusal(), parent=self)
 				return
 			case [ChecklistGone()]:
+				log.error(f"the checklist at {path} was gone before it could be opened")
 				modal.report(wording.shown_refusal(), parent=self)
 				return
 			case _:

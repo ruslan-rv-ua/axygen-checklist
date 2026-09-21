@@ -26,8 +26,11 @@ from pathlib import Path
 from unittest import mock
 
 from core import navigation, session
+from core.checklist import Change, CommentChange, Item, ProblemKind
 from core.navigation import Direction, Position
+from core.progress import Progress
 from core.run import (
+	Answer,
 	Boundary,
 	ChecklistGone,
 	ChecklistReset,
@@ -46,9 +49,6 @@ from core.run import (
 	Unreadable,
 	WriteFailed,
 )
-from core.checklist import Change, CommentChange, Item, ProblemKind
-from core.progress import Progress
-from core.run import Answer
 from core.session import Session
 
 from .support import temporary_directory
@@ -162,6 +162,20 @@ class TestNowhereToStand(RunOnDisk):
 		self.assertEqual(run.here(), [NoItems()])
 		self.assertIsNotNone(run.checklist)
 		self.assertIsNone(run.position)
+
+
+class TestAskingWhereTheTesterStands(RunOnDisk):
+	"""Section 3.3: the item is said again, and nothing moves or is written."""
+
+	def test_the_item_and_its_section_come_back_without_a_move(self):
+		run = self.opened(["pending"], ["pending", "pending"])
+		run.navigate(FORWARD, jump=False)
+		assert run.checklist is not None
+		section = run.checklist.sections[1]
+		with mock.patch("core.disk.write") as written:
+			self.assertEqual(run.here(), [Here(section.items[0], section)])
+		written.assert_not_called()
+		self.assertEqual(run.position, Position(1, 0))
 
 
 class TestNavigating(RunOnDisk):
@@ -320,7 +334,7 @@ class TestAWriteThatFails(RunOnDisk):
 	mechanism section 3.2.1 was glad to be rid of.
 	"""
 
-	def refused(self, run: Run, command: "Callable[[], list[Answer]]") -> list[Answer]:
+	def refused(self, command: Callable[[], list[Answer]]) -> list[Answer]:
 		"""What `command` answers while nothing can be swapped into place on disk."""
 		with mock.patch("os.replace", side_effect=OSError("no swap for you")):
 			return command()
@@ -329,7 +343,7 @@ class TestAWriteThatFails(RunOnDisk):
 		# The item is the last pending one and has a next item: a successful
 		# write would have answered with all three events.
 		run = self.opened(["pending", "failed"])
-		answer = self.refused(run, lambda: run.toggle(advance=True))
+		answer = self.refused(lambda: run.toggle(advance=True))
 		self.assertEqual(len(answer), 1)
 		self.assertIsInstance(answer[0], WriteFailed)
 		self.assertEqual(run.position, Position(0, 0))
@@ -337,7 +351,7 @@ class TestAWriteThatFails(RunOnDisk):
 
 	def test_the_change_stays_in_memory(self):
 		run = self.opened(["pending"])
-		self.refused(run, lambda: run.toggle(advance=False))
+		self.refused(lambda: run.toggle(advance=False))
 		assert run.checklist is not None
 		self.assertEqual(run.checklist.items[0].status, "passed")
 
@@ -346,7 +360,7 @@ class TestAWriteThatFails(RunOnDisk):
 		# write the disk is behind, and the first write that gets there takes
 		# everything that piled up with it — the earlier verdict included.
 		run = self.opened(["pending", "pending"])
-		self.refused(run, lambda: run.assign("failed", advance=False))
+		self.refused(lambda: run.assign("failed", advance=False))
 		run.navigate(FORWARD, jump=False)
 		# The end of the run counts the earlier verdict too: it is on the disk
 		# now, and the answer says so.
