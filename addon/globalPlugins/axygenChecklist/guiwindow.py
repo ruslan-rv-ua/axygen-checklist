@@ -268,6 +268,15 @@ class _ChecklistWindow(DpiScalingHelperMixinWithoutInit, wx.Dialog):
 	Built fresh on every way in and filled once, because there is no second
 	way in while it stands.
 
+	**Every button stands beside the thing it acts on** (section 5), and the
+	order things are built in here is the Tab order the tester walks: the file
+	row, then "Reset all progress" because it acts on the file, then the tree
+	with "Open item" and "Move to" in a column against it because they act on
+	the selected node, then the comment panel, the checkbox, and "Close" alone
+	in the footer. Reading order and Tab order are the same thing, which is
+	what a sighted keyboard user and a magnifier user need and what a screen
+	reader user gets for free.
+
 	Sized the way section 6 sizes every window of the add-on: NVDA's own width
 	for a window that is not a message, scaled to the screen this one is on,
 	and a border that can be dragged out — the **tree** taking every pixel of
@@ -321,7 +330,23 @@ class _ChecklistWindow(DpiScalingHelperMixinWithoutInit, wx.Dialog):
 		# Tab walk it has not got (sections 5 and 6).
 		contents = guiHelper.BoxSizerHelper(self, orientation=wx.VERTICAL)
 		contents.addItem(self._build_browse_row(), flag=wx.EXPAND)
-		self._tree: wx.TreeCtrl = contents.addLabeledControl(
+		self._reset_all = wx.Button(
+			self,
+			# Translators: The label of the button of the add-on's window that puts every item
+			# of the checklist back to not checked and erases every comment. The letter after
+			# the ampersand is the mnemonic that activates it.
+			label=_("&Reset all progress"),
+		)
+		self._reset_all.Bind(wx.EVT_BUTTON, self._on_reset)
+		# A row of its own, right under the `Browse...` pair rather than down
+		# in the footer, because this button acts on the **file** and these are
+		# the controls that talk about the file (section 5). Under the pair and
+		# not inside it: the label "Checklist file" has to keep standing
+		# immediately before its own field, which is what both the description
+		# NVDA reads and the name of the field itself hang on (section 6).
+		contents.addItem(self._reset_all)
+		tree = guiHelper.LabeledControlHelper(
+			self,
 			# Translators: The label of the tree of the add-on's window, which holds every
 			# section of the checklist and every item in them.
 			_("Checklist"),
@@ -331,8 +356,41 @@ class _ChecklistWindow(DpiScalingHelperMixinWithoutInit, wx.Dialog):
 			# the top level of the tree is the sections (section 5).
 			style=wx.TR_HAS_BUTTONS | wx.TR_HIDE_ROOT | wx.TR_LINES_AT_ROOT | wx.TR_SINGLE,
 		)
+		self._tree: wx.TreeCtrl = tree.control
 		self._tree.Bind(wx.EVT_TREE_SEL_CHANGED, self._on_selection)
 		self._tree.Bind(wx.EVT_CHAR, self._on_tree_char)
+		# The two buttons of the node, in a column beside the tree they act on
+		# (section 5). Created after the tree, and never between the tree and
+		# its label: the name of a tree is the static text immediately before
+		# it **in the Tab order**, so a button dropped in there would leave the
+		# tree announcing itself as a tree and nothing more (section 6).
+		node_buttons = guiHelper.ButtonHelper(wx.VERTICAL)
+		self._open_item: wx.Button = node_buttons.addButton(
+			self,
+			# Translators: The label of the button of the add-on's window that opens the
+			# selected checklist item in the item dialog. The letter after the ampersand is
+			# the mnemonic that activates it.
+			label=_("&Open item"),
+		)
+		self._open_item.Bind(wx.EVT_BUTTON, self._on_open_item)
+		self._move_to: wx.Button = node_buttons.addButton(
+			self,
+			# Translators: The label of the button of the add-on's window that makes the
+			# selected node the current position and closes the window. It deliberately
+			# repeats the wording of NVDA's own Elements List. The letter after the ampersand
+			# is the mnemonic that activates it.
+			label=_("&Move to"),
+		)
+		self._move_to.Bind(wx.EVT_BUTTON, self._on_move_to)
+		tree_row = wx.BoxSizer(wx.HORIZONTAL)
+		tree_row.Add(tree.sizer, flag=wx.EXPAND, proportion=1)
+		tree_row.AddSpacer(guiHelper.SPACE_BETWEEN_ASSOCIATED_CONTROL_HORIZONTAL)
+		# Held to the top of the row: two buttons centred against a tree this
+		# tall would float in the middle of it, beside nothing in particular.
+		tree_row.Add(node_buttons.sizer, flag=wx.ALIGN_TOP)
+		# The row is what takes the height the window is dragged out to, and
+		# the tree is the only thing in it that grows (section 6).
+		contents.addItem(tree_row, flag=wx.EXPAND, proportion=1)
 		comment_panel, self._comment = layout.label_above(
 			self,
 			# Translators: The label of the read-only panel under the tree of the add-on's
@@ -362,33 +420,7 @@ class _ChecklistWindow(DpiScalingHelperMixinWithoutInit, wx.Dialog):
 		# it again. What happens when the tester does is `_on_auto_advance`'s.
 		auto_advance_box.SetValue(preferences.auto_advance())
 		auto_advance_box.Bind(wx.EVT_CHECKBOX, self._on_auto_advance)
-		buttons = guiHelper.ButtonHelper(wx.HORIZONTAL)
-		self._open_item: wx.Button = buttons.addButton(
-			self,
-			# Translators: The label of the button of the add-on's window that opens the
-			# selected checklist item in the item dialog. The letter after the ampersand is
-			# the mnemonic that activates it.
-			label=_("&Open item"),
-		)
-		self._open_item.Bind(wx.EVT_BUTTON, self._on_open_item)
-		self._move_to: wx.Button = buttons.addButton(
-			self,
-			# Translators: The label of the button of the add-on's window that makes the
-			# selected node the current position and closes the window. It deliberately
-			# repeats the wording of NVDA's own Elements List. The letter after the ampersand
-			# is the mnemonic that activates it.
-			label=_("&Move to"),
-		)
-		self._move_to.Bind(wx.EVT_BUTTON, self._on_move_to)
-		self._reset_all: wx.Button = buttons.addButton(
-			self,
-			# Translators: The label of the button of the add-on's window that puts every item
-			# of the checklist back to not checked and erases every comment. The letter after
-			# the ampersand is the mnemonic that activates it.
-			label=_("&Reset all progress"),
-		)
-		self._reset_all.Bind(wx.EVT_BUTTON, self._on_reset)
-		buttons.addButton(
+		close = wx.Button(
 			self,
 			id=wx.ID_CANCEL,
 			# Translators: The label of the button of the add-on's window that closes it.
@@ -396,10 +428,14 @@ class _ChecklistWindow(DpiScalingHelperMixinWithoutInit, wx.Dialog):
 			# activates it.
 			label=_("&Close"),
 		)
-		# Not `addDialogDismissButtons`: that one is documented for buttons
-		# which dismiss the window and are the last thing in it, and "Open item"
-		# is neither. The row is placed the same way regardless.
-		contents.addItem(buttons)
+		# `addDialogDismissButtons` at last. It is documented for buttons which
+		# dismiss the window and are the last thing in it, and asserts as much;
+		# while "Open item" shared the row it could not be used, so the row
+		# went in through `addItem` with no alignment flag at all and sat
+		# pushed **left** — the only such row among the windows a tester sees
+		# side by side. Now that "Close" stands alone, the call gives the
+		# footer every NVDA window has: pushed right, ruled off from the rest.
+		contents.addDialogDismissButtons(close, separated=True)
 		main = wx.BoxSizer(wx.VERTICAL)
 		main.Add(contents.sizer, border=guiHelper.BORDER_FOR_DIALOGS, flag=wx.ALL | wx.EXPAND, proportion=1)
 		main.Fit(self)
@@ -437,7 +473,7 @@ class _ChecklistWindow(DpiScalingHelperMixinWithoutInit, wx.Dialog):
 	def _build_browse_row(self) -> wx.Sizer:
 		"""The first row of the window: the file that is open, and the way to another.
 
-		Section 5 puts this before the tree, and the order **inside** it is
+		Section 5 puts this first in the window, and the order **inside** it is
 		load-bearing as well: the label, then the field, then the button. The
 		description NVDA reads out when it announces a dialog keeps a label
 		whenever the control right after it is a button (section 6), so a
