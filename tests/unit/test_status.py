@@ -80,3 +80,48 @@ class TestTheQuickToggle(unittest.TestCase):
 		# returning. Section 4 names the honest repeat instead — a digit of the
 		# command mode, which assigns a status outright however often it is used.
 		self.assertEqual(status.toggled(status.toggled(status.FAILED)), status.PENDING)
+
+
+class TestTheCycle(unittest.TestCase):
+	"""Section 5.1: the rule behind Shift+Enter on the tree of the GUI window."""
+
+	def test_each_status_gives_the_next_one_of_the_dictionary(self):
+		self.assertEqual(
+			{value: status.cycled(value) for value in status.STATUSES},
+			{
+				status.PASSED: status.FAILED,
+				status.FAILED: status.BLOCKED,
+				status.BLOCKED: status.SKIPPED,
+				status.SKIPPED: status.PENDING,
+				status.PENDING: status.PASSED,
+			},
+		)
+
+	def test_the_cycle_wraps_at_the_end(self):
+		# `pending` is last in the dictionary, so it is the one that has to come
+		# round rather than run off the end.
+		self.assertEqual(status.cycled(status.PENDING), status.PASSED)
+
+	def test_five_presses_come_back_to_where_they_started(self):
+		for value in status.STATUSES:
+			with self.subTest(value):
+				walked = value
+				for _press in range(len(status.STATUSES)):
+					walked = status.cycled(walked)
+				self.assertEqual(walked, value)
+
+	def test_the_cycle_is_the_dictionary_and_not_a_second_list(self):
+		# The invariant section 5.1 names: one dictionary of statuses means one
+		# ordering of them. Walking the cycle from the first entry has to lay the
+		# tuple back out in order, so a list written out again here — or a cycle
+		# that skipped `pending` — would fail rather than drift quietly.
+		walked = [status.STATUSES[0]]
+		while len(walked) < len(status.STATUSES):
+			walked.append(status.cycled(walked[-1]))
+		self.assertEqual(tuple(walked), status.STATUSES)
+
+	def test_pending_stays_in_the_cycle(self):
+		# Leaving it out would make a mistake made in the tree uncorrectable from
+		# the tree, and section 4 builds "stop after a correction" on the return
+		# to it.
+		self.assertIn(status.PENDING, {status.cycled(value) for value in status.STATUSES})

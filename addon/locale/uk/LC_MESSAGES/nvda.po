@@ -88,6 +88,12 @@ msgstr "&Відкрити пункт"
 msgid "&Move to"
 msgstr "&Перейти до"
 
+#. Translators: The label of the button of the add-on's window that gives the
+#. selected checklist item the next status of the cycle. The letter after the
+#. ampersand is the mnemonic that activates it.
+msgid "&Next status"
+msgstr "&Наступний статус"
+
 #. Translators: The label of the button of the add-on's window that puts every item
 #. of the checklist back to not checked and erases every comment. The letter after
 #. the ampersand is the mnemonic that activates it.

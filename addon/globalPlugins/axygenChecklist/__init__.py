@@ -766,6 +766,7 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 			self._save_from_window,
 			self._browse,
 			self._reset_all,
+			self._cycle_from_window,
 		)
 
 	def _browse(self, path: Path) -> guiwindow.Browsed:
@@ -844,6 +845,38 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 			log.error("the window saved an item with no checklist open")
 			return
 		self._save_item(loaded, item, status_value, comment, name_the_change=False)
+
+	def _cycle_from_window(self, item: Item) -> None:
+		"""Give the item the next status of the cycle (section 5.1).
+
+		The fourth way a status is set (section 3.2), and the one that made
+		section 7.3 take its old refusal back: it adds a rule for what comes
+		next, not a place where `status` is written. The three pieces it leans
+		on are the three the other ways lean on — `_write` puts the change on
+		the disk, the dictionary supplies the word, `_announce_completion`
+		answers for the run — and none of section 4 is restated here.
+
+		It speaks outright rather than late, unlike everything else the window
+		asks for. Nothing takes the focus: the window stands, the label changes
+		under a cursor that does not move, and NVDA will not announce the node
+		of its own accord. The word is the only proof there is, so the rule of
+		silence is not bent by it — that rule forbids a second word over a proof
+		NVDA is already giving (sections 5 and 6).
+
+		Auto-advance is not called, for the reason the item dialog does not call
+		it either (section 4): the window is a deliberate stop, and what the
+		tree has selected is not where the add-on stands.
+		"""
+		loaded = self._checklist
+		if loaded is None:
+			# Unreachable: the key acts on a node of the tree, and a tree with
+			# nodes was built from a checklist.
+			log.error("the window cycled a status with no checklist open")
+			return
+		if not self._write(loaded, lambda: item.record_status(status.cycled(item.status))):
+			return
+		ui.message(wording.status_word(item.status))
+		self._announce_completion(loaded)
 
 	def _reset_all(self) -> None:
 		"""Put every item of the checklist back to pending and erase every comment.

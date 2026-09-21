@@ -60,3 +60,22 @@ def toggled(value: str) -> str:
 	cost nothing when the hand presses it twice.
 	"""
 	return PENDING if value == PASSED else PASSED
+
+
+def cycled(value: str) -> str:
+	"""The status after `value` in the cycle Shift+Enter walks (section 5.1).
+
+	The order is `STATUSES` itself and wraps at the end, so the five states
+	come round in the order the command mode digits and the combo box of the
+	item dialog already use. Deriving it from the tuple rather than writing it
+	out again is the point: one dictionary of statuses means one ordering of
+	them too, and a second list here would be free to drift from the first.
+
+	`pending` stays in the cycle. Leaving it out would make a mistake made in
+	the tree uncorrectable from the tree, and section 4 builds a whole rule on
+	the return to it — stop after a correction.
+
+	There is no way round backwards, and none is needed: five states wrap, so
+	the longest way back is four presses, and every one of them is spoken.
+	"""
+	return STATUSES[(STATUSES.index(value) + 1) % len(STATUSES)]
