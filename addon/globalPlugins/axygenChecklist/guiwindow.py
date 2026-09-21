@@ -754,10 +754,12 @@ class _ChecklistWindow(DpiScalingHelperMixinWithoutInit, wx.Dialog):
 		if event.GetKeyCode() not in (wx.WXK_RETURN, wx.WXK_NUMPAD_ENTER):
 			event.Skip()
 			return
-		pressed = {wx.MOD_CONTROL: self._move_to, wx.MOD_SHIFT: self._next_status}.get(
-			event.GetModifiers(),
-		)
-		if pressed is None:
+		modifiers = event.GetModifiers()
+		if modifiers == wx.MOD_CONTROL:
+			pressed = self._move_to
+		elif modifiers == wx.MOD_SHIFT:
+			pressed = self._next_status
+		else:
 			event.Skip()
 			return
 		# The same shape as plain Enter above, and for the same reason: a key of
