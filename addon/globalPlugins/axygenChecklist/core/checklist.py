@@ -222,10 +222,10 @@ class Item:
 		"""Put `value` in the status of the item, without writing.
 
 		A value outside the five is a programming error rather than a refusal.
-		Nothing in the shell can produce one — the combo box of the item dialog
-		is read-only precisely so that a typo cannot (section 3.3.1) — and
-		writing one would leave a file the add-on can no longer open, because
-		section 2 makes an unrecognised status fatal on read.
+		Nothing in the shell can produce one — the status of the item dialog is
+		chosen from a list and never typed (section 3.3.1) — and writing one
+		would leave a file the add-on can no longer open, because section 2
+		makes an unrecognised status fatal on read.
 		"""
 		if value not in status.STATUSES:
 			raise ValueError(f"not a status of the format: {value!r}")

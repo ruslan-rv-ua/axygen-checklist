@@ -137,7 +137,7 @@ class _FragmentsDialog(DpiScalingHelperMixinWithoutInit, wx.Dialog):
 		)
 		#: What the list is showing, kept so that the answer is read off the
 		#: position rather than off the label — the same move the item dialog
-		#: makes with its combo box, and for the same reason: the string that
+		#: makes with its status list, and for the same reason: the string that
 		#: goes to the clipboard should be the one that came out of the item,
 		#: not one that has been through a control on the way.
 		self._found = list(found)

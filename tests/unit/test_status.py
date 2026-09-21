@@ -30,7 +30,7 @@ class TestIdentifiers(unittest.TestCase):
 
 	def test_statuses_are_ordered_as_the_command_mode_digits(self):
 		# Section 3.2.2: 1 passed, 2 failed, 3 blocked, 4 skipped, 5 pending.
-		# The item dialog's combo box takes the same order (section 3.3.1), so
+		# The item dialog's status list takes the same order (section 3.3.1), so
 		# there is one ordering in the add-on rather than one per window.
 		self.assertEqual(status.STATUSES, ("passed", "failed", "blocked", "skipped", "pending"))
 

@@ -491,13 +491,12 @@ class _ChecklistWindow(DpiScalingHelperMixinWithoutInit, wx.Dialog):
 		# it again. What happens when the tester does is `_on_auto_advance`'s.
 		auto_advance_box.SetValue(preferences.auto_advance())
 		auto_advance_box.Bind(wx.EVT_CHECKBOX, self._on_auto_advance)
-		# `wx.Choice` rather than the read-only combo box the item dialog picks
-		# its status with (section 3.3.1): that style was chosen there against a
-		# named danger — a typo writing an unknown value into `status`, which
-		# section 2 makes fatal — and there is no such danger here. It is also
-		# what NVDA's own settings panels offer a choice with. The label stays
-		# beside it, since the rule that puts a label above a box measures the
-		# height of the box and this one is a line tall (section 6).
+		# The same control the item dialog picks its status with (section
+		# 3.3.1), and what NVDA's own settings panels offer a choice with: one
+		# way of naming a fixed set in the add-on rather than one per window.
+		# The label stays beside it, since the rule that puts a label above a
+		# box measures the height of the box and this one is a line tall
+		# (section 6).
 		self._initial_focus: wx.Choice = contents.addLabeledControl(
 			# Translators: The label of the control of the add-on's settings that chooses which
 			# field of the item dialog has the focus when that dialog opens.

@@ -574,7 +574,7 @@ class TestRecordingAChange(OnDisk):
 	def test_a_status_outside_the_five_never_reaches_the_file(self):
 		# Section 2 makes an unrecognised status fatal on read, so writing one
 		# would leave a file the add-on can no longer open. The shell cannot
-		# produce one — the combo box is read-only on purpose (section 3.3.1) —
+		# produce one — the status is picked from a `wx.Choice` (section 3.3.1) —
 		# which makes this a programming error rather than a refusal.
 		loaded = self.loaded()
 		with self.assertRaises(ValueError):

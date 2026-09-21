@@ -7,9 +7,9 @@
 
 Section 2 of docs/requirements.md keeps the statuses as a single table for the
 whole add-on: the word spoken on a change, the word spoken on request, the
-entries of the combo box in the item dialog and the prefix in the GUI tree all
-come from one place. That table crosses the boundary between the core and the
-shell, and the cut runs between the identifier and the word.
+entries of the status list in the item dialog and the prefix in the GUI tree
+all come from one place. That table crosses the boundary between the core and
+the shell, and the cut runs between the identifier and the word.
 
 The identifiers are here. They are what stands in the file, they are the same
 whatever the interface language, and translating them would make a checklist
@@ -25,8 +25,8 @@ SKIPPED = "skipped"
 
 #: Every status the format allows, in the order of the command mode digits
 #: (section 3.2.2: 1 passed, 2 failed, 3 blocked, 4 skipped, 5 pending). The
-#: combo box of the item dialog follows the same order (section 3.3.1), so the
-#: add-on has one ordering of the statuses rather than one per window.
+#: status list of the item dialog follows the same order (section 3.3.1), so
+#: the add-on has one ordering of the statuses rather than one per window.
 #:
 #: Position 5 belongs to `pending` because it is the "undo" slot: it is the one
 #: status that is not a verdict, and auto-advance deliberately stops on it.
@@ -66,7 +66,7 @@ def cycled(value: str) -> str:
 	"""The status after `value` in the cycle Shift+Enter walks (section 5.1).
 
 	The order is `STATUSES` itself and wraps at the end, so the five states
-	come round in the order the command mode digits and the combo box of the
+	come round in the order the command mode digits and the status list of the
 	item dialog already use. Deriving it from the tuple rather than writing it
 	out again is the point: one dictionary of statuses means one ordering of
 	them too, and a second list here would be free to drift from the first.

@@ -164,10 +164,10 @@ msgstr "Пункт"
 msgid "Note"
 msgstr "Нотатка"
 
-#. Translators: The label of the combo box of the item dialog, where the status of
+#. Translators: The label of the control of the item dialog, where the status of
 #. the checklist item is chosen.
 #. Translators: One of the fields the item dialog can open on, named in the add-on's
-#. settings. It is the label of the combo box holding the status, and has to read
+#. settings. It is the label of the control holding the status, and has to read
 #. exactly as that label does.
 msgid "Status"
 msgstr "Статус"

@@ -15,7 +15,7 @@ window needs and the reason for it; `inside_page` puts a built page inside the
 border every window of the add-on stands in.
 
 `guiHelper.associateElements` picks where a label goes from the **type** of the
-control it names: beside it for a `wx.TextCtrl`, a `wx.ComboBox` or a button,
+control it names: beside it for a `wx.TextCtrl`, a `wx.Choice` or a button,
 above it for a `wx.ListCtrl`, a `wx.ListBox` or a `wx.TreeCtrl`. The rule is
 right for a control a line tall and wrong for a box five lines tall, and the
 add-on has three of the second kind — the *"Item"* and *"Note"* fields of the

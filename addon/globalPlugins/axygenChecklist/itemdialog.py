@@ -58,10 +58,13 @@ price of this is a window whose shape varies, and section 3.3.1 takes it: NVDA
 names every control, so a different number of presses is not a place to get
 lost in.
 
-**The status is chosen, never typed.** `wx.CB_READONLY` makes arbitrary text
-structurally impossible, and section 3.3.1 wants it that way for a reason the
-file pays: one typo would put an unknown value in `status`, which section 2
-makes fatal on read — the checklist would stop opening altogether. The words
+**The status is chosen, never typed.** `wx.Choice` has no text field at all,
+which makes arbitrary text structurally impossible, and section 3.3.1 wants it
+that way for a reason the file pays: one typo would put an unknown value in
+`status`, which section 2 makes fatal on read — the checklist would stop
+opening altogether. A `wx.ComboBox` carrying `wx.CB_READONLY` forbids the same
+thing, but forbids it with a style: an edit that dropped the style would bring
+the danger back in silence, and a type cannot be dropped that way. The words
 and their order come from the one dictionary the whole add-on speaks from
 (`wording.status_word` over `core.status.STATUSES`), never from a list written
 out again here.
@@ -133,8 +136,8 @@ _COMMENT_HEIGHT = 120
 def show(item: Item, then: Callable[[str, str], None], parent: wx.Window | None = None) -> None:
 	"""Open the dialog on `item`, and hand what Save was pressed on to `then`.
 
-	`then` is given the status standing in the combo box and the comment as
-	the tester left it — text exactly as typed, blank or not, because what a
+	`then` is given the status standing in *"Status"* and the comment as the
+	tester left it — text exactly as typed, blank or not, because what a
 	blank comment amounts to is section 2's to decide and the core decides it
 	in one place. It is called for Save and for nothing else: Cancel, Escape
 	and the window being closed all mean the same thing, and section 3.3.1
@@ -184,8 +187,8 @@ class _ItemDialog(DpiScalingHelperMixinWithoutInit, wx.Dialog):
 			title=_("Checklist item"),
 			style=wx.DEFAULT_DIALOG_STYLE | wx.RESIZE_BORDER | wx.MAXIMIZE_BOX,
 		)
-		#: The status the window opened on, and the answer if the combo box is
-		#: ever asked while holding nothing; see `chosen_status`.
+		#: The status the window opened on, and the answer if the list is ever
+		#: asked while holding nothing; see `chosen_status`.
 		self._opened_on = item.status
 		main = wx.BoxSizer(wx.VERTICAL)
 		contents = guiHelper.BoxSizerHelper(self, orientation=wx.VERTICAL)
@@ -219,13 +222,12 @@ class _ItemDialog(DpiScalingHelperMixinWithoutInit, wx.Dialog):
 				size=read_only_size,
 			)
 			contents.addItem(note_field, flag=wx.EXPAND)
-		self._status: wx.ComboBox = contents.addLabeledControl(
-			# Translators: The label of the combo box of the item dialog, where the status of
+		self._status: wx.Choice = contents.addLabeledControl(
+			# Translators: The label of the control of the item dialog, where the status of
 			# the checklist item is chosen.
 			_("Status"),
-			wx.ComboBox,
+			wx.Choice,
 			choices=[wording.status_word(value) for value in status.STATUSES],
-			style=wx.CB_READONLY,
 		)
 		self._status.SetSelection(status.STATUSES.index(item.status))
 		comment_field, self._comment = layout.label_above(
@@ -316,7 +318,7 @@ class _ItemDialog(DpiScalingHelperMixinWithoutInit, wx.Dialog):
 			# above.
 			self._item.SetInsertionPoint(0)
 		elif target == focus.STATUS:
-			# Nothing beyond the focus: a combo box has no caret to place.
+			# Nothing beyond the focus: a `wx.Choice` has no caret to place.
 			self._status.SetFocus()
 		else:
 			# The comment, which is the default and was the whole of this rule
@@ -328,7 +330,7 @@ class _ItemDialog(DpiScalingHelperMixinWithoutInit, wx.Dialog):
 
 	@property
 	def chosen_status(self) -> str:
-		"""The status standing in the combo box, as the identifier section 2 writes.
+		"""The status standing in *"Status"*, as the identifier section 2 writes.
 
 		Read off the position rather than off the word: the words follow the
 		interface language and the identifiers never do, and the one ordering
@@ -336,12 +338,12 @@ class _ItemDialog(DpiScalingHelperMixinWithoutInit, wx.Dialog):
 		"""
 		chosen = self._status.GetSelection()
 		if chosen == wx.NOT_FOUND:
-			# Unreachable through the window: the list is read-only, so there
-			# is no way to unselect what the constructor selected. Were it ever
-			# to happen, the status the window opened on is the one honest
+			# Unreachable through the window: a `wx.Choice` offers no way
+			# to unselect what the constructor selected. Were it ever to
+			# happen, the status the window opened on is the one honest
 			# answer — an index of -1 would quietly read as the last of the
 			# five and write `pending` over somebody's verdict.
-			log.error("the status combo box of the item dialog is holding no selection")
+			log.error("the status list of the item dialog is holding no selection")
 			return self._opened_on
 		return status.STATUSES[chosen]
 

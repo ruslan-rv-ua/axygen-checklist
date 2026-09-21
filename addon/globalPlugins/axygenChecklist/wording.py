@@ -12,7 +12,7 @@ section 2 and section 4 insist on keeping to a single source.
 **The status dictionary, on the side of it that is a word.** Section 2 of
 docs/requirements.md keeps the statuses as a single table for the whole add-on:
 the word spoken on a change (section 4), the word spoken on request (section
-3.3), the entries of the combo box of the item dialog (section 3.3.1) and the
+3.3), the entries of the status list of the item dialog (section 3.3.1) and the
 prefix in the GUI tree (section 5) all come from one place, and a wording of
 its own per context is forbidden. The table crosses the boundary between the
 core and the shell, and the cut runs between the identifier and the word: the
@@ -98,7 +98,7 @@ class _StatusWords(NamedTuple):
 	"""
 
 	#: What a tester hears for the status: spoken on a change (section 4) and on
-	#: request (section 3.3), and shown in the combo box of the item dialog.
+	#: request (section 3.3), and shown in the status list of the item dialog.
 	word: str
 	#: What stands in front of the text of an item in the tree of the GUI window
 	#: (section 5), the separator included.
@@ -109,8 +109,8 @@ def status_word(value: str) -> str:
 	"""The word a tester hears for the status `value`.
 
 	`value` is one of `core.status.STATUSES`; the validation contract of
-	section 2 admits nothing else into a checklist, and the combo box of the
-	item dialog is read-only so that nothing else can be written back.
+	section 2 admits nothing else into a checklist, and the status control of
+	the item dialog is a `wx.Choice`, so nothing else can be written back.
 	"""
 	return _status_words(value).word
 
@@ -140,7 +140,7 @@ def focus_target_label(value: str) -> str:
 		# read exactly as that label does.
 		focus.ITEM: _("Item"),
 		# Translators: One of the fields the item dialog can open on, named in the add-on's
-		# settings. It is the label of the combo box holding the status, and has to read
+		# settings. It is the label of the control holding the status, and has to read
 		# exactly as that label does.
 		focus.STATUS: _("Status"),
 		# Translators: One of the fields the item dialog can open on, named in the add-on's

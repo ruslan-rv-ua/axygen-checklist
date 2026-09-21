@@ -179,8 +179,8 @@ _CONFIG_FOLDER = "axygenChecklist"
 #: The status each digit of the command mode assigns, by the gesture carrying
 #: it: 1 passed, 2 failed, 3 blocked, 4 skipped, 5 pending (section 3.2.2).
 #: Read off the one ordering of the statuses rather than written out a second
-#: time, so that the digits cannot drift from the combo box of the item dialog,
-#: which takes its order from the same tuple.
+#: time, so that the digits cannot drift from the status list of the item
+#: dialog, which takes its order from the same tuple.
 #:
 #: These identifiers are **looked up** as well as bound — `_digit_status` asks
 #: an arriving gesture which digit it is — so they are normalized here, in the
@@ -943,7 +943,7 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 		"""Say that the run is over: a tone, and the count (section 4).
 
 		It belongs to every path that gives an item a status — the quick
-		toggle, a digit of the command mode, the combo box of the item dialog
+		toggle, a digit of the command mode, the status list of the item dialog
 		— rather than to any one of them. It is news about the run, so
 		auto-advance has no say in whether it is spoken, and the condition is
 		the run's: nothing still `pending`, rather than everything passed.
