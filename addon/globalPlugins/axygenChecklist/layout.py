@@ -16,6 +16,11 @@ right for a control a line tall and wrong for a box five lines tall, and the
 add-on has three of the second kind — the *"Item"* and *"Note"* fields of the
 item dialog (section 3.3.1) and the comment panel of the window (section 5).
 
+The path field of the window is multiline as well and is **not** one of them:
+it is held to a single line (section 5), and the rule measures the height of
+the box rather than the style it was made with. Whoever brings it here will
+move a label that has nothing to gain by moving.
+
 Left as it comes, that costs two things. Fields whose labels differ in length
 start at different places, so the left edge of the window is ragged; and in the
 window itself the tree is labelled from above while the comment panel right

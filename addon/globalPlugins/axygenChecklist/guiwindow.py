@@ -481,12 +481,18 @@ class _ChecklistWindow(DpiScalingHelperMixinWithoutInit, wx.Dialog):
 		the path would be read at every opening, which is the one thing the
 		shape of this field exists to prevent.
 
-		**The field is editable**, and that is a requirement rather than a taste
-		(sections 5 and 6). A single-line read-only field is dropped out of the
-		Tab walk by wxWidgets and read into the description of the window by
-		NVDA; an editable one does neither. What is typed into it opens nothing
-		— only `Browse...` does — and says where the browsing starts, which is
-		what NVDA does with the same pair in `guiHelper.PathSelectionHelper`.
+		**The field is read-only and multiline**, and both halves are a
+		requirement rather than a taste (sections 5 and 6). There is nothing to
+		type into it: `Browse...` is what opens a file, and what stands in the
+		field only says where the browsing starts — so a field that takes
+		typing promises an action that does not exist. Read-only used to cost
+		two faults at once, which is why the field stayed editable for so long:
+		a single-line read-only field is dropped out of the Tab walk by
+		wxWidgets and read into the description of the window by NVDA. Being
+		multiline takes both away — `AcceptsFocusFromKeyboard()` stays true for
+		a multiline field however read-only it is, and only a **single-line**
+		read-only field is collected into the description — and it is the same
+		pair the item dialog already stands on (section 3.3.1).
 		"""
 		label = wx.StaticText(
 			self,
@@ -499,7 +505,17 @@ class _ChecklistWindow(DpiScalingHelperMixinWithoutInit, wx.Dialog):
 		# is left of it once the label and the button have theirs. A width of
 		# its own would make this row the widest thing in the window and widen
 		# the window to suit.
-		self._path = wx.TextCtrl(self)
+		self._path = wx.TextCtrl(self, style=wx.TE_READONLY | wx.TE_MULTILINE | wx.TE_NO_VSCROLL)
+		# The height is the other half of "drawn as an ordinary field" (section
+		# 5): left alone, a multiline box comes out two lines and more. The one
+		# line it is held to is asked of the control rather than counted in
+		# pixels — the font of the field knows how tall its own line is, at any
+		# DPI — and `wx.TE_NO_VSCROLL` keeps the scrollbar wx hands a multiline
+		# field out of a box that tall, where it would be a pair of arrows
+		# beside nothing.
+		self._path.SetMinSize(
+			wx.Size(-1, self._path.GetSizeFromTextSize(-1, self._path.GetCharHeight()).height),
+		)
 		browse = wx.Button(
 			self,
 			# Translators: The label of the button of the add-on's window that picks the
@@ -708,14 +724,15 @@ class _ChecklistWindow(DpiScalingHelperMixinWithoutInit, wx.Dialog):
 	def _starting_folder(self) -> Path | None:
 		"""Where the browsing starts: the folder of the path in the field (section 5).
 
-		None when the field is empty — no checklist is open, and nothing has
-		been typed — which leaves the choice to Windows. Whatever else stands
-		there is taken as the path of a file, because that is what the field
-		holds; a path that names nothing on the disk costs nothing either, as
-		the file dialog falls back to a folder of its own.
+		None when the field is empty, which is exactly when no checklist is
+		open, and that leaves the choice of folder to Windows. What stands
+		there otherwise is the path of the open file: the field is read rather
+		than the checklist asked, because the field is the answer section 5
+		gives to this question — and, since it is read-only, the two cannot
+		disagree.
 		"""
-		typed = self._path.GetValue().strip()
-		return Path(typed).parent if typed else None
+		shown = self._path.GetValue()
+		return Path(shown).parent if shown else None
 
 	def _picked(self, path: Path) -> None:
 		"""A file was picked: show the checklist it holds, or why it holds none.
