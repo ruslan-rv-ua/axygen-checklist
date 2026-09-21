@@ -364,8 +364,7 @@ class _ChecklistWindow(DpiScalingHelperMixinWithoutInit, wx.Dialog):
 		# its label: the name of a tree is the static text immediately before
 		# it **in the Tab order**, so a button dropped in there would leave the
 		# tree announcing itself as a tree and nothing more (section 6).
-		node_buttons = guiHelper.ButtonHelper(wx.VERTICAL)
-		self._open_item: wx.Button = node_buttons.addButton(
+		self._open_item = wx.Button(
 			self,
 			# Translators: The label of the button of the add-on's window that opens the
 			# selected checklist item in the item dialog. The letter after the ampersand is
@@ -373,7 +372,7 @@ class _ChecklistWindow(DpiScalingHelperMixinWithoutInit, wx.Dialog):
 			label=_("&Open item"),
 		)
 		self._open_item.Bind(wx.EVT_BUTTON, self._on_open_item)
-		self._move_to: wx.Button = node_buttons.addButton(
+		self._move_to = wx.Button(
 			self,
 			# Translators: The label of the button of the add-on's window that makes the
 			# selected node the current position and closes the window. It deliberately
@@ -385,9 +384,10 @@ class _ChecklistWindow(DpiScalingHelperMixinWithoutInit, wx.Dialog):
 		tree_row = wx.BoxSizer(wx.HORIZONTAL)
 		tree_row.Add(tree.sizer, flag=wx.EXPAND, proportion=1)
 		tree_row.AddSpacer(guiHelper.SPACE_BETWEEN_ASSOCIATED_CONTROL_HORIZONTAL)
-		# Held to the top of the row: two buttons centred against a tree this
-		# tall would float in the middle of it, beside nothing in particular.
-		tree_row.Add(node_buttons.sizer, flag=wx.ALIGN_TOP)
+		# Both the same width, which `layout` settles, and held to the top of
+		# the row: two buttons centred against a tree this tall would float in
+		# the middle of it, beside nothing in particular.
+		tree_row.Add(layout.button_column([self._open_item, self._move_to]), flag=wx.ALIGN_TOP)
 		# The row is what takes the height the window is dragged out to, and
 		# the tree is the only thing in it that grows (section 6).
 		contents.addItem(tree_row, flag=wx.EXPAND, proportion=1)

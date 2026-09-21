@@ -3,7 +3,11 @@
 # This file is covered by the GNU General Public License version 2 or later.
 # See the file COPYING.txt for more details.
 
-"""The one piece of layout `guiHelper` does not do, and why it is done here.
+"""The two pieces of layout `guiHelper` does not do, and why they are done here.
+
+Both are cases where the helper does most of the work and stops one step short,
+and both are built out of its own constants, so that a hand-made pair and a
+`guiHelper` one sit exactly the same distance apart.
 
 `guiHelper.associateElements` picks where a label goes from the **type** of the
 control it names: beside it for a `wx.TextCtrl`, a `wx.ComboBox` or a button,
@@ -28,12 +32,15 @@ and only the drawing differs. Whoever tidies this back into `associateElements`
 will get the label beside the box again; whoever reorders the two lines will
 get a tree that announces itself as "tree" and nothing else.
 
-The spacing is not ours either: it is the spacer `associateElements` puts in
-its own vertical case, so a hand-built pair and a `guiHelper` one sit the same
-distance apart.
+`guiHelper.ButtonHelper` is the other one, and it stops at the spacing: it adds
+each button to its sizer with no flags at all, so a vertical group comes out
+ragged down the right edge, every button only as wide as its own label. Its own
+docstring says a button may go straight into a sizer instead, and that is what
+`button_column` does -- with the helper's spacing constant, and with `wx.EXPAND`,
+which in a vertical sizer makes every item as wide as the widest of them.
 """
 
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 
 import wx
 from gui import guiHelper
@@ -59,3 +66,19 @@ def label_above[ControlT: wx.Control](
 	sizer.AddSpacer(guiHelper.SPACE_BETWEEN_ASSOCIATED_CONTROL_VERTICAL)
 	sizer.Add(control, flag=wx.EXPAND, proportion=1)
 	return sizer, control
+
+
+def button_column(buttons: Sequence[wx.Button]) -> wx.Sizer:
+	"""A column of buttons, every one of them drawn as wide as the widest.
+
+	Which of them is the widest is not ours to know: the labels are
+	translated, and the longer of two swaps with the shorter from one locale
+	to the next. `wx.EXPAND` asks the question at layout time instead of
+	answering it here.
+	"""
+	sizer = wx.BoxSizer(wx.VERTICAL)
+	for index, button in enumerate(buttons):
+		if index:
+			sizer.AddSpacer(guiHelper.SPACE_BETWEEN_BUTTONS_VERTICAL)
+		sizer.Add(button, flag=wx.EXPAND)
+	return sizer
