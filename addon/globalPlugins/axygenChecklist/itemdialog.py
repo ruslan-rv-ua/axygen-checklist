@@ -107,20 +107,26 @@ from collections.abc import Callable
 import addonHandler
 import wx
 from gui import guiHelper
+from gui.dpiScalingHelper import DpiScalingHelperMixinWithoutInit
 from logHandler import log
 
-from . import modal, wording
+from . import layout, modal, wording
 from .core import status
 from .core.checklist import Item
 
 addonHandler.initTranslation()
 
-#: How wide the fields are drawn, and how tall each kind is, in pixels. A
-#: courtesy to whoever is looking at the screen rather than listening to it:
-#: nothing here is measured by the tester, and every field holds its whole
-#: value however small it is drawn. Unscaled, as in NVDA's own dialogs.
-_FIELD_WIDTH = 500
-_READ_ONLY_HEIGHT = 60
+#: How tall each kind of field is drawn, before the window is scaled to the
+#: screen it is on. A courtesy to whoever is looking at the screen rather than
+#: listening to it: nothing here is measured by the tester, and every field
+#: holds its whole value however small it is drawn. The width is not a number
+#: of ours — section 6 has every window take `guiHelper.COMPLEX_DIALOG_WIDTH`.
+#:
+#: The read-only height is what it is because of fragments: an item that names
+#: a URL and a path is comfortably longer than the three lines this field used
+#: to be, and a text the tester has to scroll through with the arrows is the
+#: one thing this window exists to stop.
+_READ_ONLY_HEIGHT = 100
 _COMMENT_HEIGHT = 120
 
 
@@ -154,12 +160,20 @@ def show(item: Item, then: Callable[[str, str], None], parent: wx.Window | None 
 	modal.show(create, answered, parent)
 
 
-class _ItemDialog(wx.Dialog):
+class _ItemDialog(DpiScalingHelperMixinWithoutInit, wx.Dialog):
 	"""The window itself: four fields in the order Tab walks them, and two buttons.
 
 	Built in the order of the table of section 3.3.1, which is the whole of
 	the Tab order — wx walks the children of a dialog in the order they were
 	created, and the labels are not stops.
+
+	Sized the way section 6 sizes every window of the add-on: NVDA's own width
+	for a window that is not a message, scaled to the screen this one is on,
+	and a border that can be dragged out — *"Comment"* taking the height that
+	is dragged in, because the comment is the one field that is written here.
+
+	Three of the four fields are multi-line, and those three wear their label
+	above rather than beside; `layout` says why, and says it once.
 	"""
 
 	def __init__(self, parent: wx.Window, item: Item) -> None:
@@ -168,26 +182,33 @@ class _ItemDialog(wx.Dialog):
 			# Translators: The title of the window that shows one checklist item in full and
 			# is the only place a comment is written.
 			title=_("Checklist item"),
+			style=wx.DEFAULT_DIALOG_STYLE | wx.RESIZE_BORDER | wx.MAXIMIZE_BOX,
 		)
 		#: The status the window opened on, and the answer if the combo box is
 		#: ever asked while holding nothing; see `chosen_status`.
 		self._opened_on = item.status
 		main = wx.BoxSizer(wx.VERTICAL)
 		contents = guiHelper.BoxSizerHelper(self, orientation=wx.VERTICAL)
-		contents.addLabeledControl(
+		read_only_size = self.scaleSize((guiHelper.COMPLEX_DIALOG_WIDTH, _READ_ONLY_HEIGHT))
+		item_field, _control = layout.label_above(
+			self,
 			# Translators: The label of the read-only field of the item dialog holding the
 			# whole text of the checklist item.
 			_("Item"),
 			wx.TextCtrl,
 			value=item.text,
 			style=wx.TE_READONLY | wx.TE_MULTILINE,
-			size=(_FIELD_WIDTH, _READ_ONLY_HEIGHT),
+			size=read_only_size,
 		)
+		# Width only: the read-only fields keep the height they were given, and
+		# the one that grows with the window is "Comment" below (section 6).
+		contents.addItem(item_field, flag=wx.EXPAND)
 		# The same test section 3.3 speaks a note by, and deliberately the same
 		# one: the field is there exactly when the note is heard on landing, so
 		# the add-on has one answer to "is there a note here" rather than two.
 		if item.note:
-			contents.addLabeledControl(
+			note_field, _control = layout.label_above(
+				self,
 				# Translators: The label of the read-only field of the item dialog holding the
 				# note the author of the checklist wrote about this item. The field is there
 				# only for an item that carries one.
@@ -195,8 +216,9 @@ class _ItemDialog(wx.Dialog):
 				wx.TextCtrl,
 				value=item.note,
 				style=wx.TE_READONLY | wx.TE_MULTILINE,
-				size=(_FIELD_WIDTH, _READ_ONLY_HEIGHT),
+				size=read_only_size,
 			)
+			contents.addItem(note_field, flag=wx.EXPAND)
 		self._status: wx.ComboBox = contents.addLabeledControl(
 			# Translators: The label of the combo box of the item dialog, where the status of
 			# the checklist item is chosen.
@@ -206,15 +228,20 @@ class _ItemDialog(wx.Dialog):
 			style=wx.CB_READONLY,
 		)
 		self._status.SetSelection(status.STATUSES.index(item.status))
-		self._comment: wx.TextCtrl = contents.addLabeledControl(
+		comment_field, self._comment = layout.label_above(
+			self,
 			# Translators: The label of the editable field of the item dialog, where the tester
 			# writes their conclusion about the checklist item.
 			_("Comment"),
 			wx.TextCtrl,
 			value=item.comment or "",
 			style=wx.TE_MULTILINE,
-			size=(_FIELD_WIDTH, _COMMENT_HEIGHT),
+			size=self.scaleSize((guiHelper.COMPLEX_DIALOG_WIDTH, _COMMENT_HEIGHT)),
 		)
+		# The one field that takes the height the window is dragged out to
+		# (section 6): it is the only one written in, and the only one whose
+		# length the tester decides.
+		contents.addItem(comment_field, flag=wx.EXPAND, proportion=1)
 		buttons = guiHelper.ButtonHelper(wx.HORIZONTAL)
 		save: wx.Button = buttons.addButton(
 			self,
@@ -233,9 +260,13 @@ class _ItemDialog(wx.Dialog):
 			label=_("Cancel"),
 		)
 		contents.addDialogDismissButtons(buttons)
-		main.Add(contents.sizer, border=guiHelper.BORDER_FOR_DIALOGS, flag=wx.ALL)
+		main.Add(contents.sizer, border=guiHelper.BORDER_FOR_DIALOGS, flag=wx.ALL | wx.EXPAND, proportion=1)
 		main.Fit(self)
 		self.SetSizer(main)
+		# The size `Fit` just settled is the floor (section 6): a window that
+		# can only grow. Without it "Comment" can be dragged down to nothing,
+		# and the size is not remembered, so there would be no way back.
+		self.SetMinSize(self.GetSize())
 		# Escape means Cancel, said out loud rather than left to wx: without
 		# this it goes to the affirmative button when there is no cancel one,
 		# and a window guarded by Escape may not save on it (section 3.3.1).

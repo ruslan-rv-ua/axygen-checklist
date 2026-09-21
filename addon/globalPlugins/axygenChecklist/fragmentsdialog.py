@@ -75,16 +75,17 @@ from collections.abc import Callable, Sequence
 import addonHandler
 import wx
 from gui import guiHelper
+from gui.dpiScalingHelper import DpiScalingHelperMixinWithoutInit
 from logHandler import log
 
 from . import modal
 
 addonHandler.initTranslation()
 
-#: How wide the list is drawn, and how tall, in pixels. The width is the one
-#: the item dialog gives its fields, so that the two windows of the add-on are
-#: the same size on screen; what such a number is for is said there once.
-_LIST_WIDTH = 500
+#: How tall the list is drawn, before the window is scaled to the screen it is
+#: on. The width is not a number of ours: section 6 has every window of the
+#: add-on take `guiHelper.COMPLEX_DIALOG_WIDTH`, which is what NVDA measures
+#: its own non-message windows by.
 _LIST_HEIGHT = 200
 
 
@@ -117,8 +118,14 @@ def show(found: Sequence[str], then: Callable[[str], None]) -> None:
 	modal.show(create, answered)
 
 
-class _FragmentsDialog(wx.Dialog):
-	"""The window itself: the list the focus opens on, and two buttons."""
+class _FragmentsDialog(DpiScalingHelperMixinWithoutInit, wx.Dialog):
+	"""The window itself: the list the focus opens on, and two buttons.
+
+	Sized the way section 6 sizes every window of the add-on: the width NVDA
+	measures its own windows by, scaled to the screen this one is on, and a
+	border that can be dragged out — the list taking all of the height that
+	is dragged in, because the list is what the window is for.
+	"""
 
 	def __init__(self, parent: wx.Window, found: Sequence[str]) -> None:
 		super().__init__(
@@ -126,6 +133,7 @@ class _FragmentsDialog(wx.Dialog):
 			# Translators: The title of the window that lists the fragments of a checklist
 			# item so that one of them can be copied to the clipboard.
 			title=_("Copy a fragment"),
+			style=wx.DEFAULT_DIALOG_STYLE | wx.RESIZE_BORDER | wx.MAXIMIZE_BOX,
 		)
 		#: What the list is showing, kept so that the answer is read off the
 		#: position rather than off the label — the same move the item dialog
@@ -141,7 +149,7 @@ class _FragmentsDialog(wx.Dialog):
 			_("Fragments"),
 			wx.ListBox,
 			choices=self._found,
-			size=(_LIST_WIDTH, _LIST_HEIGHT),
+			size=self.scaleSize((guiHelper.COMPLEX_DIALOG_WIDTH, _LIST_HEIGHT)),
 		)
 		self._list.SetSelection(0)
 		buttons = guiHelper.ButtonHelper(wx.HORIZONTAL)
@@ -160,9 +168,14 @@ class _FragmentsDialog(wx.Dialog):
 			label=_("Cancel"),
 		)
 		contents.addDialogDismissButtons(buttons)
-		main.Add(contents.sizer, border=guiHelper.BORDER_FOR_DIALOGS, flag=wx.ALL)
+		main.Add(contents.sizer, border=guiHelper.BORDER_FOR_DIALOGS, flag=wx.ALL | wx.EXPAND, proportion=1)
 		main.Fit(self)
 		self.SetSizer(main)
+		# The size `Fit` just settled is the floor (section 6): a window that
+		# can only grow. Without it the list can be dragged down to no rows at
+		# all, and there is no way back — the size is not remembered, so the
+		# only repair is to close the window and open it again.
+		self.SetMinSize(self.GetSize())
 		# Escape means Cancel, said out loud rather than left to wx: without
 		# this it goes to the affirmative button when there is no cancel one,
 		# and here that button copies (sections 3.2.2 and 3.3.1).

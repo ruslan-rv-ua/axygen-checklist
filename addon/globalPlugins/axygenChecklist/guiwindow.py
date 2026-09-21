@@ -85,19 +85,20 @@ from pathlib import Path
 import addonHandler
 import wx
 from gui import guiHelper
+from gui.dpiScalingHelper import DpiScalingHelperMixinWithoutInit
 from logHandler import log
 
-from . import itemdialog, modal, preferences, signals, wording
+from . import itemdialog, layout, modal, preferences, signals, wording
 from .core.checklist import Checklist, Item
 from .core.navigation import Position
 
 addonHandler.initTranslation()
 
-#: How wide the window's controls are drawn, and how tall each kind is, in
-#: pixels. The width is the one the item dialog gives its fields, so the windows
-#: of the add-on are of a piece on screen; what such a number is for is said
-#: there once. The tree is the tall one because the tree is the window.
-_CONTROL_WIDTH = 500
+#: How tall each kind of control is drawn, before the window is scaled to the
+#: screen it is on. The tree is the tall one because the tree is the window.
+#: The width is not a number of ours — section 6 has every window of the add-on
+#: take `guiHelper.COMPLEX_DIALOG_WIDTH`, which is what NVDA measures its own
+#: non-message windows by.
 _TREE_HEIGHT = 400
 _PANEL_HEIGHT = 80
 
@@ -261,11 +262,18 @@ class _Node:
 	item: Item | None
 
 
-class _ChecklistWindow(wx.Dialog):
+class _ChecklistWindow(DpiScalingHelperMixinWithoutInit, wx.Dialog):
 	"""The window itself: the tree, the comment of what is selected, four buttons.
 
 	Built fresh on every way in and filled once, because there is no second
 	way in while it stands.
+
+	Sized the way section 6 sizes every window of the add-on: NVDA's own width
+	for a window that is not a message, scaled to the screen this one is on,
+	and a border that can be dragged out — the **tree** taking every pixel of
+	the height that is dragged in, because a checklist of sixty items in a box
+	of a fixed height is a scrolling window and not the whole structure
+	section 5 promises to show.
 	"""
 
 	def __init__(
@@ -282,6 +290,7 @@ class _ChecklistWindow(wx.Dialog):
 			# Translators: The title of the add-on's own window, which shows the whole
 			# checklist. It is the product name, which is not translated in any locale.
 			title=_("Axygen Checklist"),
+			style=wx.DEFAULT_DIALOG_STYLE | wx.RESIZE_BORDER | wx.MAXIMIZE_BOX,
 		)
 		self._on_save = on_save
 		#: What the plugin makes of a file picked with `Browse...`. Named for
@@ -317,21 +326,28 @@ class _ChecklistWindow(wx.Dialog):
 			# section of the checklist and every item in them.
 			_("Checklist"),
 			wx.TreeCtrl,
-			size=(_CONTROL_WIDTH, _TREE_HEIGHT),
+			size=self.scaleSize((guiHelper.COMPLEX_DIALOG_WIDTH, _TREE_HEIGHT)),
 			# The root is a place to hang the sections from and is never shown:
 			# the top level of the tree is the sections (section 5).
 			style=wx.TR_HAS_BUTTONS | wx.TR_HIDE_ROOT | wx.TR_LINES_AT_ROOT | wx.TR_SINGLE,
 		)
 		self._tree.Bind(wx.EVT_TREE_SEL_CHANGED, self._on_selection)
 		self._tree.Bind(wx.EVT_CHAR, self._on_tree_char)
-		self._comment: wx.TextCtrl = contents.addLabeledControl(
+		comment_panel, self._comment = layout.label_above(
+			self,
 			# Translators: The label of the read-only panel under the tree of the add-on's
 			# window, which shows the comment left on the selected checklist item.
 			_("Comment"),
 			wx.TextCtrl,
 			style=wx.TE_READONLY | wx.TE_MULTILINE,
-			size=(_CONTROL_WIDTH, _PANEL_HEIGHT),
+			size=self.scaleSize((guiHelper.COMPLEX_DIALOG_WIDTH, _PANEL_HEIGHT)),
 		)
+		# Width only: the panel keeps the height it was given, and the height
+		# the window is dragged out to goes to the tree (section 6). The label
+		# stands above the panel for the reason it stands above the tree, which
+		# is `layout`'s to say — and until now these two neighbours wore theirs
+		# two different ways.
+		contents.addItem(comment_panel, flag=wx.EXPAND)
 		auto_advance_box = contents.addItem(
 			wx.CheckBox(
 				self,
@@ -385,9 +401,14 @@ class _ChecklistWindow(wx.Dialog):
 		# is neither. The row is placed the same way regardless.
 		contents.addItem(buttons)
 		main = wx.BoxSizer(wx.VERTICAL)
-		main.Add(contents.sizer, border=guiHelper.BORDER_FOR_DIALOGS, flag=wx.ALL)
+		main.Add(contents.sizer, border=guiHelper.BORDER_FOR_DIALOGS, flag=wx.ALL | wx.EXPAND, proportion=1)
 		main.Fit(self)
 		self.SetSizer(main)
+		# The size `Fit` just settled is the floor (section 6): a window that
+		# can only grow. Without it the tree can be dragged down to no rows at
+		# all, and there is no way back — the size is not remembered, so the
+		# only repair is to close the window and open it again.
+		self.SetMinSize(self.GetSize())
 		# Escape means Close, said out loud rather than left to wx: without this
 		# it goes to the affirmative button when there is no cancel one. A
 		# `wx.Dialog` needs no accelerator table for this, where the frame this
