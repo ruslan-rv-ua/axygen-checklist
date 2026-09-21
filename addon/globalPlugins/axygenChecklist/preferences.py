@@ -58,6 +58,8 @@ from typing import TYPE_CHECKING, cast
 
 import config
 
+from .core import focus
+
 if TYPE_CHECKING:
 	# Only the type check ever needs the name, and NVDA carries a note of its
 	# own about moving the class to `config.aggregatedSection`. Imported for
@@ -83,23 +85,12 @@ AUTO_ADVANCE_DEFAULT = True
 #: Which field of the item dialog holds the focus when it opens (section 3.3.1).
 INITIAL_FOCUS = "initialFocus"
 
-#: The three fields the item dialog may open on, in the order they stand in it
-#: (section 3.3.1). Identifiers, not words: what a tester hears for each of them
-#: is the label of the field itself, and `wording.focus_target_label` says it.
-#: *"Note"* is deliberately absent — it is missing from most items, so a choice
-#: naming it would mean something other than itself on most of them, and would
-#: need a rule for falling back; these three are always there.
-FOCUS_ITEM = "item"
-FOCUS_STATUS = "status"
-FOCUS_COMMENT = "comment"
-FOCUS_TARGETS = (FOCUS_ITEM, FOCUS_STATUS, FOCUS_COMMENT)
-
 config.conf.spec[SECTION] = {
 	AUTO_ADVANCE: f"boolean(default={AUTO_ADVANCE_DEFAULT})",
 	# `string` rather than `option(…)`, though the value is one of three and
 	# `option` is exactly the check configobj has for that. It buys nothing
 	# here and costs the window: see `initial_focus`.
-	INITIAL_FOCUS: f'string(default="{FOCUS_COMMENT}")',
+	INITIAL_FOCUS: f'string(default="{focus.COMMENT}")',
 }
 
 
@@ -135,7 +126,7 @@ def set_auto_advance(enabled: bool) -> None:
 
 
 def initial_focus() -> str:
-	"""Which field the item dialog opens on — one of `FOCUS_TARGETS` (section 3.3.1).
+	"""Which field the item dialog opens on — one of `focus.TARGETS` (section 3.3.1).
 
 	Asked when the dialog is built rather than held here, for the reason
 	`auto_advance` is asked when a status is recorded: the value is NVDA's, and
@@ -170,8 +161,8 @@ def initial_focus() -> str:
 	hand back. Both callers may then map the three to three fields and need no
 	branch for a value they have never seen.
 	"""
-	stored = _stored(INITIAL_FOCUS, FOCUS_COMMENT)
-	return str(stored) if stored in FOCUS_TARGETS else FOCUS_COMMENT
+	stored = _stored(INITIAL_FOCUS, focus.COMMENT)
+	return str(stored) if stored in focus.TARGETS else focus.COMMENT
 
 
 def set_initial_focus(target: str) -> None:

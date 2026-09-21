@@ -111,7 +111,7 @@ from gui.dpiScalingHelper import DpiScalingHelperMixinWithoutInit
 from logHandler import log
 
 from . import layout, modal, preferences, wording
-from .core import status
+from .core import focus, status
 from .core.checklist import Item
 
 addonHandler.initTranslation()
@@ -308,14 +308,14 @@ class _ItemDialog(DpiScalingHelperMixinWithoutInit, wx.Dialog):
 		constructor everywhere else — and it holds through the activation above.
 		"""
 		target = preferences.initial_focus()
-		if target == preferences.FOCUS_ITEM:
+		if target == focus.ITEM:
 			self._item.SetFocus()
 			# The start, not the end: a read-only field is read from the top,
 			# which is the reason NVDA gives for the same call in its own
 			# Add-on Store. Collapsing the selection is the other half — see
 			# above.
 			self._item.SetInsertionPoint(0)
-		elif target == preferences.FOCUS_STATUS:
+		elif target == focus.STATUS:
 			# Nothing beyond the focus: a combo box has no caret to place.
 			self._status.SetFocus()
 		else:

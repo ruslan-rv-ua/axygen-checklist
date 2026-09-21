@@ -100,6 +100,7 @@ from gui.dpiScalingHelper import DpiScalingHelperMixinWithoutInit
 from logHandler import log
 
 from . import itemdialog, layout, modal, preferences, signals, wording
+from .core import focus
 from .core.checklist import Item
 from .core.navigation import Position
 from .core.progress import Progress
@@ -502,9 +503,9 @@ class _ChecklistWindow(DpiScalingHelperMixinWithoutInit, wx.Dialog):
 			# field of the item dialog has the focus when that dialog opens.
 			_("Field focused when an item is opened"),
 			wx.Choice,
-			choices=[wording.focus_target_label(target) for target in preferences.FOCUS_TARGETS],
+			choices=[wording.focus_target_label(target) for target in focus.TARGETS],
 		)
-		self._initial_focus.SetSelection(preferences.FOCUS_TARGETS.index(preferences.initial_focus()))
+		self._initial_focus.SetSelection(focus.TARGETS.index(preferences.initial_focus()))
 		self._initial_focus.Bind(wx.EVT_CHOICE, self._on_initial_focus)
 		layout.inside_page(page, contents)
 
@@ -932,11 +933,11 @@ class _ChecklistWindow(DpiScalingHelperMixinWithoutInit, wx.Dialog):
 		the control itself and a second word would be noise.
 
 		The identifier is read back from the position rather than from the label
-		shown, which is why `FOCUS_TARGETS` fixes the order the choices are
+		shown, which is why `focus.TARGETS` fixes the order the choices are
 		built in. Matching on the label would break in every locale but the one
 		it was written in.
 		"""
-		preferences.set_initial_focus(preferences.FOCUS_TARGETS[event.GetSelection()])
+		preferences.set_initial_focus(focus.TARGETS[event.GetSelection()])
 
 	def _on_open_item(self, event: wx.CommandEvent) -> None:
 		"""Open the item dialog on the selected item (section 5.2).

@@ -80,8 +80,7 @@ from typing import NamedTuple
 
 import addonHandler
 
-from . import preferences
-from .core import status
+from .core import focus, status
 from .core.checklist import Change, CommentChange, Item, Problem, ProblemKind
 from .core.progress import Progress
 
@@ -119,7 +118,7 @@ def status_word(value: str) -> str:
 def focus_target_label(value: str) -> str:
 	"""The label a tester reads for the focus target `value` (section 3.3.1).
 
-	`value` is one of `preferences.FOCUS_TARGETS`; `preferences.initial_focus`
+	`value` is one of `focus.TARGETS`; `preferences.initial_focus`
 	admits nothing else — the config spec does not, and says there why — so
 	there is no fourth answer to give.
 
@@ -139,15 +138,15 @@ def focus_target_label(value: str) -> str:
 		# Translators: One of the fields the item dialog can open on, named in the add-on's
 		# settings. It is the label of the read-only field holding the item text, and has to
 		# read exactly as that label does.
-		preferences.FOCUS_ITEM: _("Item"),
+		focus.ITEM: _("Item"),
 		# Translators: One of the fields the item dialog can open on, named in the add-on's
 		# settings. It is the label of the combo box holding the status, and has to read
 		# exactly as that label does.
-		preferences.FOCUS_STATUS: _("Status"),
+		focus.STATUS: _("Status"),
 		# Translators: One of the fields the item dialog can open on, named in the add-on's
 		# settings. It is the label of the field the comment is written in, and has to read
 		# exactly as that label does.
-		preferences.FOCUS_COMMENT: _("Comment"),
+		focus.COMMENT: _("Comment"),
 	}[value]
 
 
