@@ -79,25 +79,6 @@ msgstr "&Скинути весь прогрес"
 msgid "Checklist"
 msgstr "Чекліст"
 
-#. Translators: The label of the button of the add-on's window that opens the
-#. selected checklist item in the item dialog. The letter after the ampersand is
-#. the mnemonic that activates it.
-msgid "&Open item"
-msgstr "&Відкрити пункт"
-
-#. Translators: The label of the button of the add-on's window that makes the
-#. selected node the current position and closes the window. It deliberately
-#. repeats the wording of NVDA's own Elements List. The letter after the ampersand
-#. is the mnemonic that activates it.
-msgid "&Move to"
-msgstr "&Перейти до"
-
-#. Translators: The label of the button of the add-on's window that gives the
-#. selected checklist item the next status of the cycle. The letter after the
-#. ampersand is the mnemonic that activates it.
-msgid "&Next status"
-msgstr "&Наступний статус"
-
 #. Translators: The label of the read-only panel under the tree of the add-on's
 #. window, which shows the comment left on the selected checklist item.
 #. Translators: The label of the editable field of the item dialog, where the tester

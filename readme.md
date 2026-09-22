@@ -36,9 +36,10 @@ shows it in full and takes a comment, a fragment of an item goes to the
 clipboard, and the run says so when nothing is left unchecked. The window opens
 too, on the tree of the whole checklist and the comment of whatever is selected
 in it; Enter on an item opens the item dialog there, Ctrl+Enter moves the run
-to that item and closes the window, Browse... picks another checklist without
-leaving it, one button puts the whole run back to unchecked, and a checkbox
-turns auto-advance on and off. What is missing sits around that core.
+to that item and closes the window, Shift+Enter gives it the next status of
+the cycle, Browse... picks another checklist without leaving it, one button
+puts the whole run back to unchecked, and a checkbox turns auto-advance on and
+off. What is missing sits around that core.
 
 * **Filtering to unchecked items** — due in 0.2.0.
 

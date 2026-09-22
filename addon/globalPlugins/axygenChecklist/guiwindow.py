@@ -37,19 +37,27 @@ nothing off. What it buys is the one save that the labels cannot show — a
 comment saved on its own leaves the prefix exactly as it was (section 5.2).
 Keeping that rule free of exceptions is what `_filling` is for.
 
-**Two actions live on the tree**, and both are buttons with a key that leads
-to them (section 5.1). Enter opens the item dialog on the selected item, by
-synthesising a click on "Open item" — Enter does not reach a default button
-from a tree (wx ticket #3725), which is the same hole NVDA patches the same
-way in its own Elements List. Ctrl+Enter presses "Move to", and that one
-closes the window.
+**Three actions live on the tree, and on keys of it alone** (section 5.1):
+Enter opens the item dialog on the selected item, Ctrl+Enter moves the run to
+the selected node and closes the window, Shift+Enter gives the selected item
+the next status of the cycle. There are no buttons for them — a column of
+three stood beside the tree and was withdrawn (section 7.3), so that Tab from
+the tree lands on the comment panel in one press and the tree takes the whole
+width of the page. The names of the actions outlived the buttons, as the names
+of what the keys do.
 
-**Both of those keys belong to the tree and to nothing else in the window**,
-and the handlers hang off the tree so that this is structural rather than a
-test each of them makes (section 5.1). Ctrl+Enter used to be an accelerator
-table on the window, which is why it fired from the path field and the Close
-button alike; a table cannot be narrowed, because it hangs off the window by
-construction and eats the key before the focused control sees it.
+**All three keys have one shape**: ask the selected node whether the action is
+there, and either do it or ring `wx.Bell()` — the same bell NVDA rings in its
+own Elements List, and not a sixth tone of the add-on (section 5.1). Nothing
+is enabled or disabled: the question is put to the node at the moment the key
+is pressed.
+
+**The keys belong to the tree and to nothing else in the window**, and the
+handlers hang off the tree so that this is structural rather than a test each
+of them makes (section 5.1). Ctrl+Enter used to be an accelerator table on the
+window, which is why it fired from the path field and the Close button alike;
+a table cannot be narrowed, because it hangs off the window by construction
+and eats the key before the focused control sees it.
 
 **"Reset all progress" is the window's own action**, and the only one that
 reaches every item at once (section 5). It asks first — the same confirmation
@@ -209,7 +217,8 @@ class _Node:
 	"""What a node of the tree stands for: a place to go, and an item to read.
 
 	Both halves are optional and neither implies the other, which is exactly
-	what the two buttons ask about (section 5.1).
+	what the keys of the tree ask about (section 5.1): a half that is None is
+	an action that is not there, and the key rings.
 
 	`position` is where "Move to" would take the tester. For an item it is that
 	item; for a section it is the **first item of the section**, literally the
@@ -218,11 +227,11 @@ class _Node:
 	filter is set, so the tester is pointing at a section they can see in full,
 	and from 0.2.0 that scan would land them somewhere other than the item they
 	were looking at. It is None for a section holding no items — such a section
-	is valid (section 2) and has no first item, so there is nowhere to go and
-	the button is disabled.
+	is valid (section 2) and has no first item, so there is nowhere to go.
 
-	`item` is what "Open item" would open and what the panel below the tree
-	shows. It is None on a section, which carries no item of its own.
+	`item` is what "Open item" would open, what "Next status" would change and
+	what the panel below the tree shows. It is None on a section, which carries
+	no item of its own.
 	"""
 
 	position: Position | None
@@ -243,10 +252,12 @@ class _ChecklistWindow(DpiScalingHelperMixinWithoutInit, wx.Dialog):
 	**Every button stands beside the thing it acts on** (section 5), and the
 	order things are built in here is the Tab order the tester walks: on the run
 	page, the file row, then "Reset all progress" because it acts on the file,
-	then the tree with the three node buttons in a column against it because
-	they act on the selected node, then the comment panel. Reading order and Tab
-	order are the same thing, which is what a sighted keyboard user and a
-	magnifier user need and what a screen reader user gets for free.
+	then the tree alone, as wide as the page, then the comment panel — so that
+	Tab from the tree lands on the comment in one press, which is what the
+	column of buttons that used to stand between them was withdrawn for
+	(section 7.3). Reading order and Tab order are the same thing, which is what
+	a sighted keyboard user and a magnifier user need and what a screen reader
+	user gets for free.
 
 	**The tab strip costs a word at every entry, and the price is accepted.** A
 	`wx.Notebook` is a native tab control on wxMSW, and NVDA counts a tab
@@ -358,49 +369,12 @@ class _ChecklistWindow(DpiScalingHelperMixinWithoutInit, wx.Dialog):
 		# Enter for free because the code it reports is the translated
 		# character.
 		self._tree.Bind(wx.EVT_CHAR_HOOK, self._on_tree_chord)
-		# The three buttons of the node, in a column beside the tree they act on
-		# (section 5). Created after the tree, and never between the tree and
-		# its label: the name of a tree is the static text immediately before
-		# it **in the Tab order**, so a button dropped in there would leave the
-		# tree announcing itself as a tree and nothing more (section 6).
-		self._open_item = wx.Button(
-			run_page,
-			# Translators: The label of the button of the add-on's window that opens the
-			# selected checklist item in the item dialog. The letter after the ampersand is
-			# the mnemonic that activates it.
-			label=_("&Open item"),
-		)
-		self._open_item.Bind(wx.EVT_BUTTON, self._on_open_item)
-		self._move_to = wx.Button(
-			run_page,
-			# Translators: The label of the button of the add-on's window that makes the
-			# selected node the current position and closes the window. It deliberately
-			# repeats the wording of NVDA's own Elements List. The letter after the ampersand
-			# is the mnemonic that activates it.
-			label=_("&Move to"),
-		)
-		self._move_to.Bind(wx.EVT_BUTTON, self._on_move_to)
-		self._next_status = wx.Button(
-			run_page,
-			# Translators: The label of the button of the add-on's window that gives the
-			# selected checklist item the next status of the cycle. The letter after the
-			# ampersand is the mnemonic that activates it.
-			label=_("&Next status"),
-		)
-		self._next_status.Bind(wx.EVT_BUTTON, self._on_next_status)
-		tree_row = wx.BoxSizer(wx.HORIZONTAL)
-		tree_row.Add(tree.sizer, flag=wx.EXPAND, proportion=1)
-		tree_row.AddSpacer(guiHelper.SPACE_BETWEEN_ASSOCIATED_CONTROL_HORIZONTAL)
-		# Both the same width, which `layout` settles, and held to the top of
-		# the row: buttons centred against a tree this tall would float in the
-		# middle of it, beside nothing in particular.
-		tree_row.Add(
-			layout.button_column([self._open_item, self._move_to, self._next_status]),
-			flag=wx.ALIGN_TOP,
-		)
-		# The row is what takes the height the window is dragged out to, and
-		# the tree is the only thing in it that grows (section 6).
-		run_contents.addItem(tree_row, flag=wx.EXPAND, proportion=1)
+		# The tree alone, as wide as the page, and nothing between it and the
+		# comment panel: the column of three buttons that used to stand beside
+		# it was withdrawn (section 7.3), and its actions are the keys bound
+		# above. The tree is what takes the height the window is dragged out to
+		# (section 6).
+		run_contents.addItem(tree.sizer, flag=wx.EXPAND, proportion=1)
 		comment_panel, self._comment = layout.label_above(
 			run_page,
 			# Translators: The label of the read-only panel under the tree of the add-on's
@@ -433,11 +407,12 @@ class _ChecklistWindow(DpiScalingHelperMixinWithoutInit, wx.Dialog):
 		)
 		# `addDialogDismissButtons` at last. It is documented for buttons which
 		# dismiss the window and are the last thing in it, and asserts as much;
-		# while "Open item" shared the row it could not be used, so the row
-		# went in through `addItem` with no alignment flag at all and sat
-		# pushed **left** — the only such row among the windows a tester sees
-		# side by side. Now that "Close" stands alone, the call gives the
-		# footer every NVDA window has: pushed right, ruled off from the rest.
+		# while "Open item", then a button (section 7.3), shared the row it
+		# could not be used, so the row went in through `addItem` with no
+		# alignment flag at all and sat pushed **left** — the only such row
+		# among the windows a tester sees side by side. Now that "Close" stands
+		# alone, the call gives the footer every NVDA window has: pushed right,
+		# ruled off from the rest.
 		contents.addDialogDismissButtons(close, separated=True)
 		main = wx.BoxSizer(wx.VERTICAL)
 		main.Add(contents.sizer, border=guiHelper.BORDER_FOR_DIALOGS, flag=wx.ALL | wx.EXPAND, proportion=1)
@@ -562,8 +537,7 @@ class _ChecklistWindow(DpiScalingHelperMixinWithoutInit, wx.Dialog):
 			label=_("Browse..."),
 		)
 		browse.Bind(wx.EVT_BUTTON, self._on_browse)
-		# The button is not kept: it never changes, unlike the two below the
-		# tree, which are enabled and disabled as the selection moves.
+		# The button is not kept: nothing in here changes it again.
 		row = wx.BoxSizer(wx.HORIZONTAL)
 		row.Add(label, flag=wx.ALIGN_CENTER_VERTICAL)
 		row.AddSpacer(guiHelper.SPACE_BETWEEN_ASSOCIATED_CONTROL_HORIZONTAL)
@@ -582,8 +556,8 @@ class _ChecklistWindow(DpiScalingHelperMixinWithoutInit, wx.Dialog):
 		"""Where "Move to" was asked to take the tester, and None if it was not asked.
 
 		Read by `show` after the window has closed. None with an answer of
-		`wx.ID_OK` cannot happen through the window — the button is disabled
-		wherever there is nowhere to go — and is answered by moving nobody.
+		`wx.ID_OK` cannot happen through the window — the chord rings wherever
+		there is nowhere to go — and is answered by moving nobody.
 		"""
 		return self._chosen
 
@@ -666,28 +640,26 @@ class _ChecklistWindow(DpiScalingHelperMixinWithoutInit, wx.Dialog):
 		self._follow_selection()
 
 	def _on_selection(self, event: wx.TreeEvent) -> None:
-		"""The selection moved: show the comment, and offer what the node allows.
+		"""The selection moved: show the comment of the node under it.
 
 		Section 5 keeps the tree a view of the checklist: selecting does not
 		move the position, so nothing the tester does in here changes what the
-		next global command is about. What it does change is what the two
-		buttons can do with the node under it.
+		next global command is about. What it does change is the comment shown
+		below the tree, and whether the signal sounds.
 		"""
 		self._follow_selection()
 		event.Skip()
 
 	def _follow_selection(self) -> None:
-		"""Put the selected node's comment in the panel, and enable what it allows.
+		"""Put the selected node's comment in the panel, and sound the signal.
 
 		A section and an item nobody has commented on leave the panel blank
 		alike (section 5): a panel saying "no comment" would be telling the
 		tester what they can hear for themselves, at the price of a Tab press —
 		the objection section 3.3.1 raised to an empty *"Note"* field.
 
-		The buttons follow the two halves of `_Node`, and they are not the same
-		question: "Open item" wants an item and a section has none, while "Move
-		to" wants somewhere to go and a section has one — its first item —
-		unless it is empty (section 5.1).
+		Nothing is enabled or disabled here: the keys of the tree ask the node
+		what it allows at the moment they are pressed (section 5.1).
 
 		**The comment signal sounds from here** (section 5), which is what puts
 		the rule on the node rather than on a step the tester took: `_saved`
@@ -701,12 +673,6 @@ class _ChecklistWindow(DpiScalingHelperMixinWithoutInit, wx.Dialog):
 		# surfaces of the one fact (section 5) rather than two questions.
 		comment = None if node is None or node.item is None else node.item.comment
 		self._comment.SetValue("" if comment is None else comment)
-		self._open_item.Enable(node is not None and node.item is not None)
-		self._move_to.Enable(node is not None and node.position is not None)
-		# The same question "Open item" asks, and for the same reason: a section
-		# node has no status of its own, and the one bulk change in the add-on
-		# is the reset, which asks before it acts (sections 5 and 5.1).
-		self._next_status.Enable(node is not None and node.item is not None)
 		if comment is not None and not self._filling:
 			signals.node_has_comment()
 
@@ -730,38 +696,34 @@ class _ChecklistWindow(DpiScalingHelperMixinWithoutInit, wx.Dialog):
 		return None
 
 	def _on_tree_char(self, event: wx.KeyEvent) -> None:
-		"""Enter on the tree: press "Open item" (section 5.1).
+		"""Enter on the tree: "Open item" (section 5.1).
 
-		Enter does not reach the default button of a dialog from inside a tree
-		(wx ticket #3725), so the click is synthesised here — the same patch
-		NVDA applies in `browseMode.ElementsListDialog.onTreeChar`, down to the
-		bell on a button that is disabled. A disabled button is a section or an
-		empty tree, and section 5.1 refuses it a tone of its own: the add-on has
-		five, they have to be told apart by ear, and a sixth is not worth a node
-		NVDA has already named.
+		Bound on EVT_CHAR, where the two Enter codes have already merged — the
+		event reports the translated character, and numpad Enter arrives as the
+		same one (section 6). Enter from inside a tree would not reach a default
+		button of the dialog (wx ticket #3725); while "Open item" was a button
+		that is why a click on it was synthesised here, and now the key leads to
+		the action directly and the ticket bears on nothing (section 5.1).
 
-		A chord is left alone. Ctrl+Enter is taken by the hook on this same
-		tree, which has run and answered before this event exists at all, and
-		every other chord is somebody else's to answer.
+		A chord is left alone. Ctrl+Enter and Shift+Enter are taken by the hook
+		on this same tree, which has run and answered before this event exists
+		at all, and every other chord is somebody else's to answer.
 		"""
 		if event.GetKeyCode() != wx.WXK_RETURN or event.GetModifiers() != wx.MOD_NONE:
 			event.Skip()
 			return
-		if not self._open_item.IsEnabled():
-			wx.Bell()
-			return
-		_ = self._open_item.ProcessEvent(wx.CommandEvent(wx.wxEVT_COMMAND_BUTTON_CLICKED, wx.ID_ANY))
+		self._open_item()
 
 	def _on_tree_chord(self, event: wx.KeyEvent) -> None:
 		"""The chords of the tree: Ctrl+Enter and Shift+Enter (section 5.1).
 
-		Ctrl presses "Move to", Shift presses "Next status". Both are keys of
-		the tree and of nothing else in the window, and the hook is what makes
-		that structural rather than a test: it hangs off the tree, so it is
-		simply not called while the focus is anywhere else, and the key travels
-		on to whatever control does have the focus untouched. Outside the tree
-		there is no command, so there is nothing to report either — the bell
-		below is for a command that could not be carried out, which is a
+		Ctrl is "Move to", Shift is "Next status". Both are keys of the tree
+		and of nothing else in the window, and the hook is what makes that
+		structural rather than a test: it hangs off the tree, so it is simply
+		not called while the focus is anywhere else, and the key travels on to
+		whatever control does have the focus untouched. Outside the tree there
+		is no command, so there is nothing to report either — the bell each
+		action rings is for a command that could not be carried out, which is a
 		different thing.
 
 		Both Enter codes are named here, because the hook reports the key
@@ -774,24 +736,20 @@ class _ChecklistWindow(DpiScalingHelperMixinWithoutInit, wx.Dialog):
 			return
 		modifiers = event.GetModifiers()
 		if modifiers == wx.MOD_CONTROL:
-			pressed = self._move_to
+			self._move_to()
 		elif modifiers == wx.MOD_SHIFT:
-			pressed = self._next_status
+			self._next_status()
 		else:
 			event.Skip()
-			return
-		# The same shape as plain Enter above, and for the same reason: a key of
-		# the tree fires where the button it leads to cannot be pressed.
-		if not pressed.IsEnabled():
-			wx.Bell()
-			return
-		_ = pressed.ProcessEvent(wx.CommandEvent(wx.wxEVT_COMMAND_BUTTON_CLICKED, wx.ID_ANY))
 
-	def _on_next_status(self, event: wx.CommandEvent) -> None:
+	def _next_status(self) -> None:
 		"""Give the selected item the next status of the cycle (section 5.1).
 
-		Both ways in arrive here as the one event: the button clicked, and the
-		click the tree synthesises for Shift+Enter.
+		Shift+Enter on the tree is the one way in. The key has the shape all
+		three keys of the tree share: the node is asked whether the action is
+		there, and a section or an empty tree gets the bell — a section has no
+		status of its own, and the one bulk change in the add-on is the reset,
+		which asks before it acts (section 5.1).
 
 		The window decides nothing about the status itself. Which one comes
 		next and what reaches the disk belong to the run, as they do for every
@@ -813,10 +771,7 @@ class _ChecklistWindow(DpiScalingHelperMixinWithoutInit, wx.Dialog):
 		node = self._tree.GetSelection()
 		selected = self._stands_for(node)
 		if selected is None or selected.item is None:
-			# Nothing gets this far: the button is disabled on a section node and
-			# on an empty tree, and the chord asks it that same question before
-			# synthesising the click (section 5.1).
-			log.error("the window was asked for the next status of a node holding no item")
+			wx.Bell()
 			return
 		item = selected.item
 		self._narrate(self._run.cycle(item))
@@ -938,8 +893,11 @@ class _ChecklistWindow(DpiScalingHelperMixinWithoutInit, wx.Dialog):
 		"""
 		preferences.set_initial_focus(focus.TARGETS[event.GetSelection()])
 
-	def _on_open_item(self, event: wx.CommandEvent) -> None:
+	def _open_item(self) -> None:
 		"""Open the item dialog on the selected item (section 5.2).
+
+		Enter on the tree is the one way in, and a section or an empty tree
+		gets the bell: there is no item to open (section 5.1).
 
 		The same dialog the second press of `NVDA+Alt+I` opens, with this window
 		as its parent — which is the whole difference, and `modal.show` holds
@@ -953,9 +911,7 @@ class _ChecklistWindow(DpiScalingHelperMixinWithoutInit, wx.Dialog):
 		node = self._tree.GetSelection()
 		stands_for = self._stands_for(node)
 		if stands_for is None or stands_for.item is None:
-			# Unreachable through the window: the button is disabled wherever
-			# there is no item under the selection.
-			log.error("the item dialog was asked for on a node holding no item")
+			wx.Bell()
 			return
 		item = stands_for.item
 		itemdialog.show(
@@ -987,25 +943,21 @@ class _ChecklistWindow(DpiScalingHelperMixinWithoutInit, wx.Dialog):
 		self._tree.SetItemText(node, wording.tree_label(item))
 		self._follow_selection()
 
-	def _on_move_to(self, event: wx.CommandEvent) -> None:
+	def _move_to(self) -> None:
 		"""Move to the selected node and close the window (section 5.1).
+
+		Ctrl+Enter on the tree is the one way in, and the bell rings where
+		there is nowhere to go: an empty tree, or a section holding no items.
+		A section holding some stands for its first one, which `_Node` settles.
 
 		The position itself is not moved here. The window records where it was
 		asked to go and ends as `wx.ID_OK`; `show` hands that to the plugin once
 		the window has gone, because what is said about the landing has to
 		outlive the window closing (section 6).
-
-		Both ways in arrive here as the one event: the button clicked, and the
-		click the tree synthesises for Ctrl+Enter (section 5.1). Which one the
-		tester used is not a difference worth keeping.
 		"""
 		node = self._selected()
 		if node is None or node.position is None:
-			# Nothing gets this far. The button is disabled wherever there is
-			# nowhere to go, and the chord asks it that same question before
-			# synthesising the click — so the bell for the case lives there,
-			# beside the one plain Enter rings (section 5.1).
-			log.error("the window was asked to move to a node there is no moving to")
+			wx.Bell()
 			return
 		self._chosen = node.position
 		self.EndModal(wx.ID_OK)

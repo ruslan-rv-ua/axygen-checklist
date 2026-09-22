@@ -9,7 +9,7 @@ Every one of them is a case where the helper does most of the work and stops one
 step short, and each is built out of its own constants, so that a hand-made pair
 and a `guiHelper` one sit exactly the same distance apart.
 
-Two of the four are about notebook pages, which `guiHelper` has never had to
+Two of the three are about notebook pages, which `guiHelper` has never had to
 draw: its own dialogs have no tabs. `page_contents` carries the one cast the
 window needs and the reason for it; `inside_page` puts a built page inside the
 border every window of the add-on stands in.
@@ -41,16 +41,9 @@ first, control second, exactly as `guiHelper.LabeledControlHelper` creates it,
 and only the drawing differs. Whoever tidies this back into `associateElements`
 will get the label beside the box again; whoever reorders the two lines will
 get a tree that announces itself as "tree" and nothing else.
-
-`guiHelper.ButtonHelper` is the other one, and it stops at the spacing: it adds
-each button to its sizer with no flags at all, so a vertical group comes out
-ragged down the right edge, every button only as wide as its own label. Its own
-docstring says a button may go straight into a sizer instead, and that is what
-`button_column` does -- with the helper's spacing constant, and with `wx.EXPAND`,
-which in a vertical sizer makes every item as wide as the widest of them.
 """
 
-from collections.abc import Callable, Sequence
+from collections.abc import Callable
 from typing import cast
 
 import wx
@@ -116,19 +109,3 @@ def inside_page(page: wx.Panel, contents: guiHelper.BoxSizerHelper) -> None:
 	sizer = wx.BoxSizer(wx.VERTICAL)
 	sizer.Add(contents.sizer, border=guiHelper.BORDER_FOR_DIALOGS, flag=wx.ALL | wx.EXPAND, proportion=1)
 	page.SetSizer(sizer)
-
-
-def button_column(buttons: Sequence[wx.Button]) -> wx.Sizer:
-	"""A column of buttons, every one of them drawn as wide as the widest.
-
-	Which of them is the widest is not ours to know: the labels are
-	translated, and the longer of two swaps with the shorter from one locale
-	to the next. `wx.EXPAND` asks the question at layout time instead of
-	answering it here.
-	"""
-	sizer = wx.BoxSizer(wx.VERTICAL)
-	for index, button in enumerate(buttons):
-		if index:
-			sizer.AddSpacer(guiHelper.SPACE_BETWEEN_BUTTONS_VERTICAL)
-		sizer.Add(button, flag=wx.EXPAND)
-	return sizer
