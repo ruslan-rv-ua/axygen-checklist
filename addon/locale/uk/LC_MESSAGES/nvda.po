@@ -7,7 +7,7 @@ msgstr ""
 "Project-Id-Version: 'axygenChecklist' '0.0.0'\n"
 "Report-Msgid-Bugs-To: 'https://github.com/ruslan-rv-ua/axygen-checklist/"
 "issues'\n"
-"POT-Creation-Date: 2026-09-21 12:35+0300\n"
+"POT-Creation-Date: 2026-09-22 06:15+0300\n"
 "PO-Revision-Date: 2026-09-16 20:04+0300\n"
 "Last-Translator: Ruslan Iskov <ruslan.rv.ua@gmail.com>\n"
 "Language-Team: Ukrainian\n"
@@ -377,11 +377,6 @@ msgstr "Розділ: {name}, опрацьовано {processed} з {total}"
 msgid ", {count} failed"
 msgstr ", провалено {count}"
 
-#. Translators: Spoken when NVDA starts and the checklist that was open
-#. last time is no longer where it was.
-msgid "Checklist file not found"
-msgstr "Файл чекліста не знайдено"
-
 #. Translators: The description of a command, as it appears in NVDA's Input Gestures dialog.
 msgid ""
 "Moves to the next item of the checklist. Twice: to the first item of the "
@@ -479,10 +474,6 @@ msgstr "Кінець списку"
 msgid "Start of list"
 msgstr "Початок списку"
 
-#. Translators: Spoken after the current section of the checklist has been reset.
-msgid "Section reset"
-msgstr "Розділ скинуто"
-
 #. Translators: Spoken when a command is used before a checklist has been opened.
 msgid "No checklist loaded"
 msgstr "Чекліст не завантажено"
@@ -491,6 +482,15 @@ msgstr "Чекліст не завантажено"
 #. are all empty, so there is no item to stand on.
 msgid "The checklist has no items"
 msgstr "У чеклісті немає пунктів"
+
+#. Translators: Spoken after the current section of the checklist has been reset.
+msgid "Section reset"
+msgstr "Розділ скинуто"
+
+#. Translators: Spoken when NVDA starts and the checklist that was open
+#. last time is no longer where it was.
+msgid "Checklist file not found"
+msgstr "Файл чекліста не знайдено"
 
 #. Add-on description
 #. Translators: Long description to be shown for this add-on on add-on information from add-on store
@@ -509,5 +509,13 @@ msgstr ""
 
 #. Brief changelog for this version
 #. Translators: what's new content for the add-on version to be shown in the add-on store
-msgid "First development version."
-msgstr "Перша версія в розробці."
+msgid ""
+"First release: the core of the checklist walk-through. Open a JSON "
+"checklist, move through it and mark items with global hotkeys, comment on "
+"items, copy fragments, reset a section or the run, resume after a restart, "
+"and manage everything from the add-on window."
+msgstr ""
+"Перший реліз: ядро проходження чекліста. Відкрийте чекліст у JSON, рухайтеся "
+"по ньому й позначайте пункти глобальними командами, коментуйте пункти, "
+"копіюйте фрагменти, скидайте розділ чи прогін, продовжуйте після перезапуску "
+"й керуйте всім із вікна додатка."

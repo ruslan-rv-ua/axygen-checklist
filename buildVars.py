@@ -25,10 +25,10 @@ Items are marked passed, failed or skipped, commented and read back by speech, w
 Checklists are plain JSON files that record the result of the run."""),
 	# version
 	# Kept at the "not yet released" sentinel on develop; release branches set the real number.
-	addon_version="0.0.0",
+	addon_version="0.1.0",
 	# Brief changelog for this version
 	# Translators: what's new content for the add-on version to be shown in the add-on store
-	addon_changelog=_("""First development version."""),
+	addon_changelog=_("""First release: the core of the checklist walk-through. Open a JSON checklist, move through it and mark items with global hotkeys, comment on items, copy fragments, reset a section or the run, resume after a restart, and manage everything from the add-on window."""),
 	# Author(s)
 	addon_author="Ruslan Iskov <ruslan.rv.ua@gmail.com>",
 	# URL for the add-on documentation support
