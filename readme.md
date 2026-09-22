@@ -2,68 +2,40 @@
 
 An NVDA add-on for testers who work by ear.
 
-[Українською](https://github.com/ruslan-rv-ua/axygen-checklist/blob/develop/addon/doc/uk/readme.md)
+[Українською](readme.uk.md)
 
-Axygen Checklist walks a test checklist with global commands while the system
-focus stays in the application under test. An item can be marked passed, failed
-or skipped, commented on, read back by speech and filtered out of the way
-without ever leaving the window being tested.
+Axygen Checklist reads a test checklist to you item by item and lets you record the result of each check with a few global NVDA commands, while the system focus stays in the application you are testing. No more Alt+Tab between the list and the product: the list comes to you by speech, and the verdict goes into the file with one key press.
 
-A checklist is a plain JSON file. It carries the items to check and, once the
-run is over, the result of each one, so a run can be handed over, kept next to
-the build it belongs to, or repeated later.
+An item can be marked passed, failed, blocked or skipped, given a comment and read back on request. Every change is written to the checklist file immediately, and the add-on remembers where you were across NVDA restarts. When you want the whole picture, a window shows the checklist as a tree with the comment of the selected item and the add-on's settings.
 
-Checklists are usually written by a coding agent working inside the project
-under test, so the format is documented for one:
-[how to write a checklist](https://github.com/ruslan-rv-ua/axygen-checklist/blob/develop/docs/checklist-format.md),
-with a [JSON Schema](https://github.com/ruslan-rv-ua/axygen-checklist/blob/develop/docs/checklist-v1.schema.json)
-next to it and a block to paste into your project's `AGENTS.md`. Worth reading
-before letting an agent edit a checklist somebody has already run: the statuses
-and comments in the file are a tester's work, not the agent's to regenerate.
+The full user guide, the same one NVDA opens from the add-on's Help button, is in [addon/doc/en/readme.md](addon/doc/en/readme.md). It walks through a first run, explains every key and window, and lists the messages and sounds and what they mean.
 
-Commands all sit under `NVDA+Alt`. `NVDA+Alt+O` arms a command mode for three
-seconds, and the key pressed after it does the work — `O` again opens a
-checklist file, which is where a first run starts. NVDA's own Input Gestures
-dialog lists every command of the add-on, each with a line on what it does,
-under the category **Axygen Checklist**.
+## Who it is for
 
-## Not in this version yet
+Blind and low-vision testers and developers who use NVDA and run manual checklists against desktop or web applications. Everything the add-on says is designed to be heard: short phrases in a fixed order, sounds where a word would be too slow, silence where the screen reader already says enough.
 
-This page describes the add-on as a whole, and not all of it is built yet.
-Walking a checklist works: a file opens, the commands move through it, an item
-takes a status and the run moves on to the next one by itself, the item dialog
-shows it in full and takes a comment, a fragment of an item goes to the
-clipboard, and the run says so when nothing is left unchecked. The window opens
-too, on the tree of the whole checklist and the comment of whatever is selected
-in it; Enter on an item opens the item dialog there, Ctrl+Enter moves the run
-to that item and closes the window, Shift+Enter gives it the next status of
-the cycle, Browse... picks another checklist without leaving it, one button
-puts the whole run back to unchecked, and a checkbox turns auto-advance on and
-off. What is missing sits around that core.
+## Getting started
 
-* **Filtering to unchecked items** — due in 0.2.0.
+1. Install the add-on from the Add-on Store or from the `.nvda-addon` file. It needs NVDA 2026.1 or newer and is tested up to 2026.2.
+2. Put the focus in the application you are going to test.
+3. Press `NVDA+Alt+O`, release, then press `O`. Choose a checklist file in the dialog that opens. The first item is read to you, section name first.
+4. Do the check, then press `NVDA+Alt+Space` to mark the item passed. The next item follows.
+5. For any other verdict press `NVDA+Alt+O`, release, then a digit: `2` failed, `3` blocked, `4` skipped, `5` back to not checked. `NVDA+Alt+I` twice opens the item dialog where you type a comment.
 
-Until 1.0.0 the checklist file format and the set of commands may still change
-from one release to the next. From 1.0.0 on, neither changes without a major
-version bump.
+That is the whole loop. `NVDA+Alt+PageDown` and `NVDA+Alt+PageUp` move through the items, twice quickly through the sections, and `NVDA+Alt+I` reads the current item again. The rarer commands, progress, section reset, copying an exact string from the item, auto-advance and the window, live behind `NVDA+Alt+O` as single letters; the guide lists them all. Every command is also listed, with a description, in NVDA's Input Gestures dialog under the category **Axygen Checklist**, where you can rebind any of them.
 
-## When a command does nothing
+## Checklist files
 
-Axygen Checklist claims the `NVDA+Alt` prefix. Another add-on may bind the same
-combination, and nothing tells you so: whichever global plugin NVDA happens to
-reach first wins, and that order is not guaranteed to survive a restart. The
-key simply does the wrong thing.
+A checklist is a plain JSON file with sections and items. It carries the items to check and, once the run is over, the status and comment of each one, so a run can be handed over, kept next to the build it belongs to, or repeated later.
 
-The fix is NVDA's own dialog: **Preferences → Input Gestures → category Axygen
-Checklist**. Deleting a binding there hands the key back to whoever else wants
-it; adding one gives a command a combination of your choosing. Every command
-appears in that category, including the ones that normally live inside the
-command mode and ship with no key at all.
+Checklists are usually written by a coding agent working inside the project under test, so the format is documented for one: [how to write a checklist](docs/checklist-format.md), with a [JSON Schema](docs/checklist-v1.schema.json) next to it and a block to paste into your project's `AGENTS.md`. Worth reading before letting an agent edit a checklist somebody has already run: the statuses and comments in the file are a tester's work, not the agent's to regenerate.
 
-The same dialog is the answer if the entry key feels wrong under your hands.
-It was chosen for an `NVDA` key on `CapsLock`, where both modifiers fall to the
-left hand and the letter to the right; with `NVDA` on `Insert` a different
-letter is easier.
+## Status of the project
 
-Copyright (C) 2026 Ruslan Iskov. Distributed under the terms of the GNU General
-Public License version 2 or later; see COPYING.txt.
+The core is complete: opening a file, moving, marking, the item dialog with comments, fragments, resets, auto-advance, the window, and resuming after a restart. Still to come are the filter to unchecked items (0.2.0), a Markdown report of the run (1.0.0) and voice switching between recent checklists (1.1.0). Until 1.0.0 the file format and the set of commands may change between releases; from 1.0.0 on, neither changes without a major version bump.
+
+## For developers
+
+The behaviour is specified in [docs/requirements.md](docs/requirements.md) (in Ukrainian), which is the single source of truth for the format, the keys and the wording. Building, linking the working copy into a live NVDA and the release checklist are in [docs/development.md](docs/development.md). Issues and tasks live in the [GitHub tracker](https://github.com/ruslan-rv-ua/axygen-checklist/issues).
+
+Copyright (C) 2026 Ruslan Iskov. Distributed under the terms of the GNU General Public License version 2 or later; see [COPYING.txt](COPYING.txt).

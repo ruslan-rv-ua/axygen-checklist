@@ -12,7 +12,6 @@ addon/manifest.ini
 addon/locale/*/manifest.ini
 addon/doc/style.css
 addon/doc/*/*.html
-addon/doc/en/
 *.mo
 *.pot
 .sconsign.dblite

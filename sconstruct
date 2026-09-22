@@ -111,10 +111,11 @@ if (cssFile := Path("style.css")).is_file():
 	cssTarget = env.Command(str(cssPath), str(cssFile), Copy("$TARGET", "$SOURCE"))
 	env.Depends(addon, cssTarget)
 
-if (readmeFile := Path("readme.md")).is_file():
-	readmePath = docsDir / buildVars.baseLanguage / readmeFile
-	readmeTarget = env.Command(str(readmePath), str(readmeFile), Copy("$TARGET", "$SOURCE"))
-	env.Depends(addon, readmeTarget)
+# Deviation from the add-on template: the template copies the root `readme.md` into
+# `addon/doc/<baseLanguage>/` so that one file serves as both the repository README and
+# the add-on's help. Here the two differ on purpose -- the README is a short introduction,
+# the help is the full user guide -- so `addon/doc/en/readme.md` is a tracked source of its
+# own and nothing is copied over it. See docs/development.md, section 2.
 
 for mdFile in env.Glob(docsDir / "*/*.md"):
 	# the title of the html file is translated based on the contents of something in the moFile for a language.
@@ -151,4 +152,4 @@ env.Depends(manifest, "buildVars.py")
 
 env.Depends(addon, manifest)
 env.Default(addon)
-env.Clean(addon, [".sconsign.dblite", "addon/doc/" + buildVars.baseLanguage + "/"])
+env.Clean(addon, [".sconsign.dblite"])
